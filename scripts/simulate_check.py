@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""End-to-end simulation test runner for sys1-helper."""
+
+import sys
+import json
+import subprocess
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+PYTHON = sys.executable
+
+GREEN = "\033[92m"
+RED = "\033[91m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
+
+def print_status(name: str, passed: bool, detail: str = ""):
+    status = f"{GREEN}PASS{RESET}" if passed else f"{RED}FAIL{RESET}"
+    print(f"[{status}] {BOLD}{name}{RESET}")
+    if detail:
+        print(f"       -> {detail}")
+
+
+def run_cmd(cmd_list, stdin_payload=None):
+    proc = subprocess.run(
+        cmd_list,
+        input=stdin_payload,
+        capture_output=True,
+        text=True,
+        cwd=str(ROOT),
+    )
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def main():
+    print(f"{BOLD}=== sys1-helper End-to-End Simulation ==={RESET}\n")
+
+    # 1. Daemon Health Check
+    _, stdout, _ = run_cmd(["curl", "-s", "http://127.0.0.1:8765/health"])
+    try:
+        health = json.loads(stdout)
+        is_healthy = health.get("status") == "ok"
+        dev = health.get("device", "unknown")
+        print_status("1. Daemon Connectivity", is_healthy, f"device: {dev}")
+    except Exception:
+        print_status("1. Daemon Connectivity", False, "Daemon not running on :8765")
+        return
+
+    # 2. PreToolUse Guardrail - Simulate Dangerous Action (Should BLOCK)
+    payload_bad = json.dumps({
+        "toolCall": {
+            "name": "write_file",
+            "args": {"content": "OPENAI_API_KEY = 'sk-proj-1234567890abcdef1234567890'"}
+        }
+    })
+    _, out_bad, _ = run_cmd([PYTHON, "hooks/pre_tool_enforcer.py"], stdin_payload=payload_bad)
+    try:
+        res_bad = json.loads(out_bad)
+        blocked = res_bad.get("decision") == "deny" and not res_bad.get("allow_tool")
+        reason = res_bad.get("reason", "")[:70]
+        print_status("2. Guardrail Block Dangerous Edit", blocked, f"reason: {reason}")
+    except Exception as e:
+        print_status("2. Guardrail Block Dangerous Edit", False, str(e))
+
+    # 3. PreToolUse Guardrail - Simulate Safe Action (Should ALLOW)
+    payload_good = json.dumps({
+        "toolCall": {
+            "name": "write_file",
+            "args": {"content": "def calculate_total(items): return sum(items)"}
+        }
+    })
+    _, out_good, _ = run_cmd([PYTHON, "hooks/pre_tool_enforcer.py"], stdin_payload=payload_good)
+    try:
+        res_good = json.loads(out_good)
+        allowed = res_good.get("decision") == "allow" and res_good.get("allow_tool")
+        print_status("3. Guardrail Allow Safe Edit", allowed, "passed cleanly")
+    except Exception as e:
+        print_status("3. Guardrail Allow Safe Edit", False, str(e))
+
+    # 4. PreInvocation Hook - Simulate Skill Routing
+    payload_inv = json.dumps({"prompt": "Can you review git diff changes and check for security bugs?"})
+    _, out_inv, _ = run_cmd([PYTHON, "hooks/pre_invocation.py"], stdin_payload=payload_inv)
+    try:
+        res_inv = json.loads(out_inv)
+        context = res_inv.get("additionalContext", "")
+        routed = "/review_gate" in context or "review" in context.lower()
+        print_status("4. Intent / Skill Router", routed, f"routed: {context}")
+    except Exception as e:
+        print_status("4. Intent / Skill Router", False, str(e))
+
+    # 5. Surgical Context Retrieval (jevgrep)
+    code, out_grep, _ = run_cmd([PYTHON, "skills/laya-grep/run.py", "predict lock thread", "daemon/server.py"])
+    try:
+        res_grep = json.loads(out_grep)
+        matches = res_grep.get("matches_count", 0)
+        top_snippet = res_grep["snippets"][0] if matches > 0 else {}
+        print_status(
+            "5. Surgical Retrieval (jevgrep)",
+            matches > 0,
+            f"found {matches} snippets (lines {top_snippet.get('start_line')}-{top_snippet.get('end_line')})",
+        )
+    except Exception as e:
+        print_status("5. Surgical Retrieval (jevgrep)", False, str(e))
+
+    # 6. Memory Promotion Gate
+    from lib.memory_gate import judge_memory_promotion
+    mem_res = judge_memory_promotion("Always use parameterized SQL queries; never interpolate raw strings.")
+    print_status(
+        "6. Memory Promotion Gate",
+        mem_res["should_promote"],
+        f"category: {mem_res['category']} ({mem_res['recommendation']})",
+    )
+
+    # 7. Loop Detector
+    from lib.loop_detector import check_agent_loop
+    stuck_actions = [
+        {"tool": "run_command", "args": {"cmd": "npm test"}},
+        {"tool": "run_command", "args": {"cmd": "npm test"}},
+        {"tool": "run_command", "args": {"cmd": "npm test"}},
+    ]
+    loop_res = check_agent_loop(stuck_actions)
+    print_status("7. Infinite Loop Detector", loop_res["is_looping"], loop_res["reason"][:70])
+
+    print(f"\n{BOLD}=== Simulation Complete ==={RESET}\n")
+
+
+if __name__ == "__main__":
+    main()
