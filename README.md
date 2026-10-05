@@ -1,6 +1,6 @@
 # sys1-helper
 
-Local System 1 decision engine for `agy-cli` agents powered by [Laya](https://github.com/convaiinnovations/laya).
+Local System 1 decision engine for `agy-cli` agents powered by [Laya](https://github.com/NandhaKishorM/laya).
 
 Provides sub-30ms offline policy enforcement, intent routing, test coverage judgment, and context compaction before running slow, expensive LLM calls.
 
