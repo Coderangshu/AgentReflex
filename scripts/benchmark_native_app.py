@@ -50,7 +50,7 @@ def run_benchmark():
     # Search for database schema in Native-App
     t0 = time.perf_counter()
     proc_grep = subprocess.run(
-        [str(PYTHON), str(ROOT / "skills/laya-grep/run.py"), "database schema drizzle", str(TARGET_DIR / "db")],
+        [str(PYTHON), str(ROOT / "skills/reflex-grep/run.py"), "database schema drizzle", str(TARGET_DIR / "db")],
         text=True,
         capture_output=True,
         cwd=str(ROOT),
@@ -110,7 +110,7 @@ def run_benchmark():
     )
     raw_tokens_est = len(raw_expo_log) // 4
     proc_compact = subprocess.run(
-        [str(PYTHON), str(ROOT / "skills/laya-compact/run.py"), "--text", raw_expo_log],
+        [str(PYTHON), str(ROOT / "skills/reflex-compact/run.py"), "--text", raw_expo_log],
         text=True,
         capture_output=True,
         cwd=str(ROOT),

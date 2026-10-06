@@ -31,7 +31,7 @@ def main():
             eval_result = judge_test_coverage(content)
             if eval_result.get("requires_verification", False):
                 sys.stderr.write(
-                    f"[Laya Test Judge] Notice: Significant uncovered logic detected "
+                    f"[AgentReflex Test Judge] Notice: Significant uncovered logic detected "
                     f"(risk score: {eval_result['uncovered_risk']:.2f}). Consider writing unit tests.\n"
                 )
 

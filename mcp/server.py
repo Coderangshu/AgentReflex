@@ -52,7 +52,7 @@ TOOLS = [
     },
     {
         "name": "sys1_grep",
-        "description": "Surgical code retrieval (jevgrep). Chunks files into 20-30 line windows, scores each locally via Laya in ~30ms, and returns only strictly relevant snippets instead of entire files.",
+        "description": "Surgical code retrieval (jevgrep). Chunks files into 20-30 line windows, scores each locally in ~30ms, and returns only strictly relevant snippets instead of entire files.",
         "inputSchema": {
             "type": "object",
             "properties": {

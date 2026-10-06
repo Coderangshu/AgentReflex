@@ -1,6 +1,6 @@
 # AgentReflex
 
-Local System 1 reflex decision engine for `agy-cli` and `Claude Code` coding agents powered by [Laya](https://github.com/NandhaKishorM/laya).
+Local System 1 reflex decision engine for various coding agents powered by [Laya](https://github.com/NandhaKishorM/laya).
 
 Provides sub-30ms offline policy enforcement, intent routing, test coverage judgment, and context compaction before running slow, expensive LLM calls.
 
@@ -65,17 +65,17 @@ cd /path/to/your-target-project
 > `install_hooks.sh` automatically detects the `.venv/bin/python` interpreter inside `sys1-helper` and binds it explicitly inside `.agents/hooks.json`. This guarantees `agy-cli` runs the hooks in `sys1-helper`'s isolated environment without polluting or conflicting with your target project's Python version, Node runtime, or dependencies.
 
 This creates `.agents/` inside the target directory:
-- **`.agents/hooks.json`**: Configures `PreInvocation`, `PreToolUse`, and `PostToolUse` hooks pointing to `sys1-helper/.venv/bin/python`.
-- **`.agents/skills/`**: Symlinks all 4 skills (`laya-fast-explore`, `laya-review-gate`, `laya-compact`, `laya-grep`).
+- **`.agents/hooks.json`**: Configures `PreInvocation`, `PreToolUse`, and `PostToolUse` hooks pointing to `agentreflex/.venv/bin/python`.
+- **`.agents/skills/`**: Symlinks all 4 skills (`reflex-fast-explore`, `reflex-review-gate`, `reflex-compact`, `reflex-grep`).
 
 ### Global Skills Attach (All Projects)
 To make skills available everywhere across all `agy` sessions:
 
 ```bash
-ln -sfn /path/to/sys1-helper/skills/laya-fast-explore ~/.gemini/config/skills/laya-fast-explore
-ln -sfn /path/to/sys1-helper/skills/laya-review-gate ~/.gemini/config/skills/laya-review-gate
-ln -sfn /path/to/sys1-helper/skills/laya-compact ~/.gemini/config/skills/laya-compact
-ln -sfn /path/to/sys1-helper/skills/laya-grep ~/.gemini/config/skills/laya-grep
+ln -sfn /path/to/agentreflex/skills/reflex-fast-explore ~/.gemini/config/skills/reflex-fast-explore
+ln -sfn /path/to/agentreflex/skills/reflex-review-gate ~/.gemini/config/skills/reflex-review-gate
+ln -sfn /path/to/agentreflex/skills/reflex-compact ~/.gemini/config/skills/reflex-compact
+ln -sfn /path/to/agentreflex/skills/reflex-grep ~/.gemini/config/skills/reflex-grep
 ```
 
 ### Execution Flow in `agy`
@@ -83,7 +83,7 @@ Once attached, launch the agent normally inside your project:
 ```bash
 agy
 ```
-1. **Before Prompt Execution (`PreInvocation`)**: Routes user goals and injects recommended skill context (`/fast_explore`, `/review_gate`, `/laya-grep`). Compresses active transcript if `>50KB` (pruning terminal downloads/progress bars by 80–90%).
+1. **Before Prompt Execution (`PreInvocation`)**: Routes user goals and injects recommended skill context (`/reflex-fast-explore`, `/reflex-review-gate`, `/reflex-grep`). Compresses active transcript if `>50KB` (pruning terminal downloads/progress bars by 80–90%).
 2. **Before Tool Execution (`PreToolUse`)**: Intercepts edits and commands in ~36ms on GPU, blocking hardcoded secrets, raw SQL, and destructive commands (`allow_tool: false`). Detects and halts runaway agent loops.
 3. **After Tool Execution (`PostToolUse`)**: Inspects written code and flags newly introduced logic lacking test coverage.
 
@@ -143,43 +143,43 @@ Once registered, Claude Code has instant access to 7 System 1 tools:
 
 ## 3. Standalone Skills CLI Usage
 
-### Fast File Explorer (`laya-fast-explore`)
+### Fast File Explorer (`reflex-fast-explore`)
 Quickly rank candidate paths so the agent only reads top matches:
 
 ```bash
-python skills/laya-fast-explore/run.py "database migration files" $(find . -name "*.py")
+python skills/reflex-fast-explore/run.py "database migration files" $(find . -name "*.py")
 # Or pipe:
-find . -name "*.py" | python skills/laya-fast-explore/run.py "auth controllers"
+find . -name "*.py" | python skills/reflex-fast-explore/run.py "auth controllers"
 ```
 
-### 7-Point PR / Diff Risk Gate (`laya-review-gate`)
+### 7-Point PR / Diff Risk Gate (`reflex-review-gate`)
 Evaluate diff against 7 risk vectors (breaking API, security injection, secret leak, perf regression, missing tests, unhandled exceptions, schema breaking):
 
 ```bash
 # Evaluate current working changes:
-git diff | python skills/laya-review-gate/run.py
+git diff | python skills/reflex-review-gate/run.py
 
 # Evaluate specific commit:
-git diff HEAD~1 | python skills/laya-review-gate/run.py
+git diff HEAD~1 | python skills/reflex-review-gate/run.py
 ```
 Exit code `0` on APPROVE, exit code `1` on REJECT / CHANGES REQUIRED.
 
-### Context Compactor (`laya-compact`)
+### Context Compactor (`reflex-compact`)
 Prune disposable noise and terminal vomit from session context:
 
 ```bash
 # Compact conversation transcript:
-python skills/laya-compact/run.py --transcript /path/to/transcript.jsonl
+python skills/reflex-compact/run.py --transcript /path/to/transcript.jsonl
 
 # Compact raw command output or logs:
-cat build.log | python skills/laya-compact/run.py
+cat build.log | python skills/reflex-compact/run.py
 ```
 
-### Surgical Context Retrieval (`laya-grep` / jevgrep)
+### Surgical Context Retrieval (`reflex-grep` / jevgrep)
 Extract strictly relevant 20-30 line snippets instead of loading full files into LLM context:
 
 ```bash
-python skills/laya-grep/run.py "detect infinite loop" lib/
+python skills/reflex-grep/run.py "detect infinite loop" lib/
 ```
 
 ---

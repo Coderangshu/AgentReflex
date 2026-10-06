@@ -9,10 +9,10 @@ echo "Installing Laya hooks and skills into: $TARGET_DIR"
 mkdir -p "$TARGET_DIR/.agents/skills"
 
 # 1. Symlink Skills
-ln -sfn "$TOOLKIT_ROOT/skills/laya-fast-explore" "$TARGET_DIR/.agents/skills/laya-fast-explore"
-ln -sfn "$TOOLKIT_ROOT/skills/laya-review-gate" "$TARGET_DIR/.agents/skills/laya-review-gate"
-ln -sfn "$TOOLKIT_ROOT/skills/laya-compact" "$TARGET_DIR/.agents/skills/laya-compact"
-ln -sfn "$TOOLKIT_ROOT/skills/laya-grep" "$TARGET_DIR/.agents/skills/laya-grep"
+ln -sfn "$TOOLKIT_ROOT/skills/reflex-fast-explore" "$TARGET_DIR/.agents/skills/reflex-fast-explore"
+ln -sfn "$TOOLKIT_ROOT/skills/reflex-review-gate" "$TARGET_DIR/.agents/skills/reflex-review-gate"
+ln -sfn "$TOOLKIT_ROOT/skills/reflex-compact" "$TARGET_DIR/.agents/skills/reflex-compact"
+ln -sfn "$TOOLKIT_ROOT/skills/reflex-grep" "$TARGET_DIR/.agents/skills/reflex-grep"
 
 PYTHON_BIN="python3"
 if [ -f "$TOOLKIT_ROOT/.venv/bin/python" ]; then
@@ -22,7 +22,7 @@ fi
 # 2. Generate or update .agents/hooks.json
 cat <<EOF > "$TARGET_DIR/.agents/hooks.json"
 {
-  "laya-guardrails": {
+  "reflex-guardrails": {
     "PreInvocation": [
       {
         "type": "command",

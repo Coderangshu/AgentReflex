@@ -37,7 +37,7 @@ def check_violations(
         "violates": score >= threshold,
         "score": score,
         "rule": rule,
-        "reason": f"Laya rule guardrail triggered ({score:.0%} certainty): {rule}"
+        "reason": f"AgentReflex rule guardrail triggered ({score:.0%} certainty): {rule}"
         if score >= threshold
         else "",
     }

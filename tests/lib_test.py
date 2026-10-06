@@ -88,7 +88,7 @@ class TestSys1HelperLib(unittest.TestCase):
         }
         res = check_violations("api_key = 'sk_live_1234567890'")
         self.assertTrue(res["violates"])
-        self.assertIn("Laya rule guardrail triggered", res["reason"])
+        self.assertIn("AgentReflex rule guardrail triggered", res["reason"])
 
 
 if __name__ == "__main__":

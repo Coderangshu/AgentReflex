@@ -62,7 +62,7 @@ def compact_recent_transcript(transcript_path_str: str) -> dict:
         if pruned_steps > 0:
             sample_kept = kept_summaries[-5:]  # Keep last 5 essential points
             summary_text = (
-                f"[Laya Auto-Compaction]: Pruned {pruned_steps}/{total_steps} noise steps "
+                f"[AgentReflex Auto-Compaction]: Pruned {pruned_steps}/{total_steps} noise steps "
                 f"from active transcript ({file_size // 1024}KB -> lean memory). "
                 f"Essential context: {' | '.join(sample_kept) if sample_kept else 'Clean state preserved'}."
             )
@@ -96,7 +96,7 @@ def main():
         context_parts = []
         inject_steps = []
 
-        # 1. Automatic Laya transcript compaction if context window is bloated
+        # 1. Automatic transcript compaction if context window is bloated
         compaction_res = compact_recent_transcript(transcript_path)
         if compaction_res.get("active"):
             summary_msg = compaction_res["summary"]
@@ -110,7 +110,7 @@ def main():
             conf = result.get("confidence", 0.0)
 
             if choice != "none" and conf > 0.65:
-                route_msg = f"[Laya Context Router]: Recommended skill for this request: /{choice}"
+                route_msg = f"[AgentReflex Context Router]: Recommended skill for this request: /{choice}"
                 context_parts.append(route_msg)
                 inject_steps.append({"ephemeralMessage": route_msg})
 

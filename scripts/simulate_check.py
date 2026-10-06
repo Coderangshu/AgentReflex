@@ -91,7 +91,7 @@ def main():
         print_status("4. Intent / Skill Router", False, str(e))
 
     # 5. Surgical Context Retrieval (jevgrep)
-    code, out_grep, _ = run_cmd([PYTHON, "skills/laya-grep/run.py", "predict lock thread", "daemon/server.py"])
+    code, out_grep, _ = run_cmd([PYTHON, "skills/reflex-grep/run.py", "predict lock thread", "daemon/server.py"])
     try:
         res_grep = json.loads(out_grep)
         matches = res_grep.get("matches_count", 0)

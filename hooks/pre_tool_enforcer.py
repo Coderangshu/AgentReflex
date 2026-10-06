@@ -87,7 +87,7 @@ def main():
         result = check_violations(content)
 
         if result.get("violates", False):
-            reason = result.get("reason", "Laya rule guardrail triggered")
+            reason = result.get("reason", "AgentReflex rule guardrail triggered")
             print(
                 json.dumps(
                     {

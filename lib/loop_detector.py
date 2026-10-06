@@ -60,7 +60,7 @@ def check_agent_loop(recent_actions: list[dict], threshold: float = 0.70) -> dic
     return {
         "is_looping": is_looping,
         "loop_score": score,
-        "reason": f"Laya loop detector triggered ({score:.0%} certainty): Agent appears stuck without forward progress."
+        "reason": f"AgentReflex loop detector triggered ({score:.0%} certainty): Agent appears stuck without forward progress."
         if is_looping
         else "Normal execution flow",
     }
