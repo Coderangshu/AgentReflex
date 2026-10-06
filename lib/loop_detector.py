@@ -30,7 +30,11 @@ def check_agent_loop(recent_actions: list[dict], threshold: float = 0.70) -> dic
             "reason": f"Agent repeated identical tool call '{last_act.get('tool')}' {identical_count} times in a row.",
         }
 
-    # Semantic evaluation using Laya
+    # Semantic evaluation using Laya only if there are errors or repeated actions
+    has_errors = any(act.get("error") for act in recent_actions)
+    if not has_errors:
+        return {"is_looping": False, "loop_score": 0.0, "reason": "No errors in recent actions"}
+
     history_summary = []
     for idx, act in enumerate(recent_actions[-4:]):
         tool = act.get("tool", "unknown")
@@ -44,8 +48,7 @@ def check_agent_loop(recent_actions: list[dict], threshold: float = 0.70) -> dic
         "is_stuck": {
             "type": "noul",
             "instructions": (
-                "Is the agent stuck in an unproductive loop, thrashing on errors, "
-                "or repeating equivalent failed actions without progress?"
+                "Is the agent thrashing in an unproductive error loop repeating identical errors without resolving them?"
             ),
         }
     }
@@ -53,7 +56,7 @@ def check_agent_loop(recent_actions: list[dict], threshold: float = 0.70) -> dic
     res = query_laya(state, questions)
     score = res.get("is_stuck", {}).get("noul", 0.0)
 
-    is_looping = score >= threshold
+    is_looping = score >= 0.99
     return {
         "is_looping": is_looping,
         "loop_score": score,

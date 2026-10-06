@@ -8,3 +8,4 @@ build/
 dist/
 .daemon.pid
 daemon.log
+.agents

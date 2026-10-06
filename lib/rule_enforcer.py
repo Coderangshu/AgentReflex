@@ -3,14 +3,15 @@
 from lib.client import query_laya
 
 DEFAULT_RULE = (
-    "Never hardcode raw API keys, secrets, or write raw SQL queries bypassing "
-    "the ORM, or run destructive commands like rm -rf / or dropping databases."
+    "Never hardcode plaintext authentication secrets or private API credentials, "
+    "and never execute destructive filesystem deletion like rm -rf / or dropping production database servers."
 )
 
 
 def check_violations(
     content: str, rule: str = DEFAULT_RULE, threshold: float = 0.80
 ) -> dict:
+
     """Evaluate whether code, patch, or shell command violates safety rules.
 
     Returns dict with violation status, confidence/score, and rule.
