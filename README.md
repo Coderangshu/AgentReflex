@@ -1,6 +1,6 @@
 # sys1-helper
 
-Local System 1 decision engine for `agy-cli` agents powered by [Laya](https://github.com/NandhaKishorM/laya).
+Local System 1 decision engine for `agy-cli` and `Claude Code` agents powered by [Laya](https://github.com/NandhaKishorM/laya).
 
 Provides sub-30ms offline policy enforcement, intent routing, test coverage judgment, and context compaction before running slow, expensive LLM calls.
 
@@ -30,7 +30,7 @@ make start
 make status
 # Output: {"status":"ok","service":"sys1-helper","device":"mps"} Daemon is running healthy.
 
-# Run unit tests
+# Run unit tests (including MCP server protocol tests)
 make test
 
 # Run end-to-end simulation self-check
@@ -44,10 +44,17 @@ make stop
 
 ---
 
-## 2. Attaching to `agy-cli`
+## 2. Integration & Getting Started
 
-### Option A: Project-Level Attach (Recommended)
-Attach hooks and skills to any codebase where you use `agy`:
+Choose your primary agent workflow below:
+
+<details>
+<summary><strong>Option A: Google Antigravity (agy-cli) Setup</strong></summary>
+
+<br>
+
+### Project-Level Attach (Recommended)
+Attach native hooks and skills to any project where you run `agy`:
 
 ```bash
 cd /path/to/your-target-project
@@ -61,7 +68,7 @@ This creates `.agents/` inside the target directory:
 - **`.agents/hooks.json`**: Configures `PreInvocation`, `PreToolUse`, and `PostToolUse` hooks pointing to `sys1-helper/.venv/bin/python`.
 - **`.agents/skills/`**: Symlinks all 4 skills (`laya-fast-explore`, `laya-review-gate`, `laya-compact`, `laya-grep`).
 
-### Option B: Global Skills Attach (All Projects)
+### Global Skills Attach (All Projects)
 To make skills available everywhere across all `agy` sessions:
 
 ```bash
@@ -71,31 +78,66 @@ ln -sfn /path/to/sys1-helper/skills/laya-compact ~/.gemini/config/skills/laya-co
 ln -sfn /path/to/sys1-helper/skills/laya-grep ~/.gemini/config/skills/laya-grep
 ```
 
----
-
-## 3. How It Works During `agy` Execution
-
+### Execution Flow in `agy`
 Once attached, launch the agent normally inside your project:
-
 ```bash
 agy
 ```
+1. **Before Prompt Execution (`PreInvocation`)**: Routes user goals and injects recommended skill context (`/fast_explore`, `/review_gate`, `/laya-grep`). Compresses active transcript if `>50KB` (pruning terminal downloads/progress bars by 80–90%).
+2. **Before Tool Execution (`PreToolUse`)**: Intercepts edits and commands in ~36ms on GPU, blocking hardcoded secrets, raw SQL, and destructive commands (`allow_tool: false`). Detects and halts runaway agent loops.
+3. **After Tool Execution (`PostToolUse`)**: Inspects written code and flags newly introduced logic lacking test coverage.
 
-`agy-cli` automatically hooks into `sys1-helper`:
+</details>
 
-1. **Before Prompt Execution (`PreInvocation`)**:
-   - **Intent & Skill Routing**: Routes user goals and injects recommended skill context (`/fast_explore`, `/review_gate`, `/laya-grep`).
-   - **Automatic Transcript Compaction**: Monitors session size. When transcript exceeds `50KB`, automatically scores and prunes terminal progress noise/downloads (`80–90%` reduction), injecting lean context to prevent expensive native LLM context window blowup.
-2. **Before Tool Execution (`PreToolUse`)**:
-   - [hooks/pre_tool_enforcer.py](hooks/pre_tool_enforcer.py) intercepts proposed code edits and shell commands in ~36ms on GPU.
-   - **Policy Enforcement**: Blocks hardcoded secrets, raw SQL, and destructive commands (`allow_tool: false`).
-   - **Loop Detection**: Halts runaway agent loops if identical tool calls are repeated `>= 3x`.
-3. **After Tool Execution (`PostToolUse`)**:
-   - [hooks/post_tool_judge.py](hooks/post_tool_judge.py) inspects newly written code and flags logic lacking test coverage.
+<details>
+<summary><strong>Option B: Claude Code Setup</strong></summary>
+
+<br>
+
+Claude Code interacts with `sys1-helper` via Model Context Protocol (MCP) using a standard-library JSON-RPC 2.0 stdio server (`mcp/server.py`).
+
+### Step 1: Register MCP Server in Claude Code
+Register the `sys1-helper` MCP server with Claude Code either globally or for a specific project:
+
+```bash
+# Add to Claude Code MCP registry
+claude mcp add sys1-helper /path/to/sys1-helper/.venv/bin/python /path/to/sys1-helper/mcp/server.py
+```
+
+Alternatively, add it directly to your Claude Code settings or project `.claude.json`:
+```json
+{
+  "mcpServers": {
+    "sys1-helper": {
+      "command": "/path/to/sys1-helper/.venv/bin/python",
+      "args": ["/path/to/sys1-helper/mcp/server.py"]
+    }
+  }
+}
+```
+
+### Step 2: Add Reflex Rules (`CLAUDE.md`)
+Copy `CLAUDE.md` to your target project root so Claude automatically triggers System 1 tools reflexively:
+
+```bash
+cp /path/to/sys1-helper/CLAUDE.md /path/to/your-target-project/CLAUDE.md
+```
+
+### Exposed MCP Tools (7 Core Modules)
+Once registered, Claude Code has instant access to 7 System 1 tools:
+- **`sys1_check_violations`**: Pre-action guardrail checking code edits and shell commands for secrets, destructive `rm -rf`, and database drops before running them.
+- **`sys1_grep`**: Surgical context retrieval (`jevgrep`). Chunks target files into 20–30 line windows, scores them locally via Laya in ~30ms, and returns only strictly relevant snippets.
+- **`sys1_review_gate`**: 7-point PR / diff risk audit across API breaks, injections, leaks, perf regressions, test gaps, unhandled errors, and contract violations.
+- **`sys1_compact`**: Scores terminal output or conversation logs to distinguish disposable noise from retainable state.
+- **`sys1_rank_files`**: Reranks candidate file paths by semantic relevance to a task intent.
+- **`sys1_judge_coverage`**: Evaluates newly modified code to check if unit tests are required.
+- **`sys1_memory_gate`**: Filters post-task lessons, ensuring only durable patterns (`rule`, `architecture`, `gotcha`) are stored in long-term memory.
+
+</details>
 
 ---
 
-## 4. Standalone Skills CLI Usage
+## 3. Standalone Skills CLI Usage
 
 ### Fast File Explorer (`laya-fast-explore`)
 Quickly rank candidate paths so the agent only reads top matches:
@@ -138,7 +180,7 @@ python skills/laya-grep/run.py "detect infinite loop" lib/
 
 ---
 
-## 5. Core Engine Capabilities & Token Savings (`lib/`)
+## 4. Core Engine Capabilities & Token Savings (`lib/`)
 
 Each module offloads specialized binary or classification decisions from expensive frontier LLMs to the local Laya engine (<50ms on GPU):
 
@@ -154,11 +196,11 @@ Each module offloads specialized binary or classification decisions from expensi
 | **`lib/review_gate.py`** | 7-point PR/diff risk gate (API breaks, security injections, leaks, perf regressions, test gaps, unhandled panics, schema breaks). | Delivers instant pass/fail risk audits in **sub-second time**, reducing repetitive full-diff reviews by frontier models. |
 | **`lib/judge.py`** | Evaluates code diffs immediately after tool execution to detect newly introduced logic lacking test coverage. | Flags test gaps in **~40ms**, catching omissions early before expensive downstream test and fix cycles. |
 | **`lib/browser_nav.py`** | Scores interactive DOM elements (buttons, inputs, links) to pick the exact target satisfying the user goal. | Eliminates transmitting massive 10,000+ token raw HTML dumps to the LLM; ranks candidates locally. |
-| **`lib/client.py`** | Lightweight, persistent HTTP connection pool linking hooks and skills to the resident Laya daemon. | Sub-millisecond IPC with zero process boot overhead; keeps single model loaded in GPU memory. |
+| **`lib/client.py`** | Lightweight, persistent HTTP connection pool linking hooks and skills to the resident Laya daemon using zero-dependency standard library (`urllib`). | Sub-millisecond IPC with zero process boot overhead; keeps single model loaded in GPU memory. |
 
 ---
 
-## 6. Benchmarks & Performance Benefits
+## 5. Benchmarks & Performance Benefits
 
 Benchmarked directly against an active full-stack codebase (`Native-App` - React Native / Expo / Drizzle):
 
@@ -171,7 +213,7 @@ Benchmarked directly against an active full-stack codebase (`Native-App` - React
 
 ---
 
-## 7. Overcoming the Small Context Size Bottleneck
+## 6. Overcoming the Small Context Size Bottleneck
 
 The base Laya model (`ModernBERT-large`) is designed for sub-50ms System 1 classification with a single-window context budget of 512 tokens (~1,200 characters).
 

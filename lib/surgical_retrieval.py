@@ -4,6 +4,8 @@ Chunks code files into windows or symbol blocks, scores each locally in ~30ms,
 and extracts only the strictly necessary lines to minimize LLM token consumption.
 """
 
+from __future__ import annotations
+from typing import Union, List, Dict
 from pathlib import Path
 from lib.client import query_laya
 
