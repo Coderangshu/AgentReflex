@@ -1,6 +1,6 @@
-# sys1-helper
+# AgentReflex
 
-Local System 1 decision engine for `agy-cli` and `Claude Code` coding agents powered by [Laya](https://github.com/NandhaKishorM/laya).
+Local System 1 reflex decision engine for `agy-cli` and `Claude Code` coding agents powered by [Laya](https://github.com/NandhaKishorM/laya).
 
 Provides sub-30ms offline policy enforcement, intent routing, test coverage judgment, and context compaction before running slow, expensive LLM calls.
 
@@ -9,9 +9,9 @@ Provides sub-30ms offline policy enforcement, intent routing, test coverage judg
 ## 1. Quickstart & Daemon Setup
 
 ### Step 1: Create Isolated Virtual Environment & Install
-Create a dedicated virtual environment inside `sys1-helper` to isolate dependencies:
+Create a dedicated virtual environment inside `agentreflex` to isolate dependencies:
 ```bash
-cd sys1-helper
+cd agentreflex # or sys1-helper
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -28,7 +28,7 @@ make start
 ```bash
 # Check daemon health and device (MPS / CUDA / CPU)
 make status
-# Output: {"status":"ok","service":"sys1-helper","device":"mps"} Daemon is running healthy.
+# Output: {"status":"ok","service":"agentreflex","device":"mps"} Daemon is running healthy.
 
 # Run unit tests (including MCP server protocol tests)
 make test
@@ -97,20 +97,20 @@ agy
 Claude Code interacts with `sys1-helper` via Model Context Protocol (MCP) using a standard-library JSON-RPC 2.0 stdio server (`mcp/server.py`).
 
 ### Step 1: Register MCP Server in Claude Code
-Register the `sys1-helper` MCP server with Claude Code either globally or for a specific project:
+Register the `agentreflex` MCP server with Claude Code either globally or for a specific project:
 
 ```bash
 # Add to Claude Code MCP registry
-claude mcp add sys1-helper /path/to/sys1-helper/.venv/bin/python /path/to/sys1-helper/mcp/server.py
+claude mcp add agentreflex /path/to/agentreflex/.venv/bin/python /path/to/agentreflex/mcp/server.py
 ```
 
 Alternatively, add it directly to your Claude Code settings or project `.claude.json`:
 ```json
 {
   "mcpServers": {
-    "sys1-helper": {
-      "command": "/path/to/sys1-helper/.venv/bin/python",
-      "args": ["/path/to/sys1-helper/mcp/server.py"]
+    "agentreflex": {
+      "command": "/path/to/agentreflex/.venv/bin/python",
+      "args": ["/path/to/agentreflex/mcp/server.py"]
     }
   }
 }

@@ -35,7 +35,7 @@ def run_cmd(cmd_list, stdin_payload=None):
 
 
 def main():
-    print(f"{BOLD}=== sys1-helper End-to-End Simulation ==={RESET}\n")
+    print(f"{BOLD}=== AgentReflex End-to-End Simulation ==={RESET}\n")
 
     # 1. Daemon Health Check
     _, stdout, _ = run_cmd(["curl", "-s", "http://127.0.0.1:8765/health"])

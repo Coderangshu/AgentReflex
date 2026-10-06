@@ -36,7 +36,7 @@ class TestMCPServer(unittest.TestCase):
 
     def test_initialize(self):
         res = self.rpc("initialize")
-        self.assertEqual(res["result"]["serverInfo"]["name"], "sys1-helper")
+        self.assertEqual(res["result"]["serverInfo"]["name"], "agentreflex")
 
     def test_list_tools(self):
         res = self.rpc("tools/list")

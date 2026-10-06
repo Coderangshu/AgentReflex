@@ -1,6 +1,6 @@
-# System 1 Reflex Rules for Claude Code
+# AgentReflex Rules for Claude Code
 
-This project is connected to the local `sys1-helper` decision engine via MCP. Always use System 1 reflex tools to save tokens and enforce policy:
+This project is connected to the local `AgentReflex` decision engine via MCP. Always use System 1 reflex tools to save tokens and enforce policy:
 
 ## 1. Code Search & Inspection Reflex
 - **NEVER** use broad file reads or `grep` to read entire 500+ line files into context when looking for specific logic or definitions.

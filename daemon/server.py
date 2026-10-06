@@ -20,7 +20,7 @@ def detect_device() -> str:
 
 DEVICE = detect_device()
 
-app = FastAPI(title="sys1-helper Daemon")
+app = FastAPI(title="AgentReflex Daemon")
 router = Router(preload=True, device=DEVICE)
 
 # PyTorch MPS on macOS requires serialization so concurrent threads
@@ -35,7 +35,7 @@ class DecisionPayload(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "sys1-helper", "device": DEVICE}
+    return {"status": "ok", "service": "agentreflex", "device": DEVICE}
 
 
 @app.post("/predict")

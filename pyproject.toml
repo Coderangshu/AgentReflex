@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sys1-helper"
+name = "agentreflex"
 version = "0.1.0"
-description = "Local System 1 decision engine for agy-cli agents"
+description = "Local System 1 reflex decision engine for coding agents"
 dependencies = [
     "laya>=0.1.0",
     "fastapi>=0.110.0",

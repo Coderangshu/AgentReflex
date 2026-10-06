@@ -30,7 +30,7 @@ if [ ! -f "$TOOLKIT_ROOT/.venv/bin/python" ]; then
   echo "    python3 -m venv .venv && source .venv/bin/activate && pip install -e ."
 fi
 
-echo "Starting sys1-helper Laya daemon in background..."
+echo "Starting AgentReflex Laya daemon in background..."
 echo "(First run downloads ~300MB Laya model weights to your environment)..."
 nohup "$PYTHON_BIN" "$TOOLKIT_ROOT/daemon/server.py" > "$LOG_FILE" 2>&1 &
 PID=$!
@@ -41,7 +41,7 @@ echo "Daemon process started with PID $PID (logs: $LOG_FILE)"
 # Wait up to 30 seconds for daemon to finish loading / downloading checkpoint
 for i in {1..60}; do
   if curl -s http://127.0.0.1:8765/health > /dev/null 2>&1; then
-    echo "✅ sys1-helper daemon is healthy at http://127.0.0.1:8765"
+    echo "✅ AgentReflex daemon is healthy at http://127.0.0.1:8765"
     exit 0
   fi
   sleep 0.5

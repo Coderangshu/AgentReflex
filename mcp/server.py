@@ -241,7 +241,7 @@ def run_server():
                     "protocolVersion": "2024-11-05",
                     "capabilities": {"tools": {}},
                     "serverInfo": {
-                        "name": "sys1-helper",
+                        "name": "agentreflex",
                         "version": "0.1.0",
                     },
                 },
