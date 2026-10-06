@@ -84,10 +84,12 @@ agy
 `agy-cli` automatically hooks into `sys1-helper`:
 
 1. **Before Prompt Execution (`PreInvocation`)**:
-   - [hooks/pre_invocation.py](hooks/pre_invocation.py) routes user intent and injects recommended skill context (`/fast_explore` or `/review_gate`).
+   - **Intent & Skill Routing**: Routes user goals and injects recommended skill context (`/fast_explore`, `/review_gate`, `/laya-grep`).
+   - **Automatic Transcript Compaction**: Monitors session size. When transcript exceeds `50KB`, automatically scores and prunes terminal progress noise/downloads (`80–90%` reduction), injecting lean context to prevent expensive native LLM context window blowup.
 2. **Before Tool Execution (`PreToolUse`)**:
-   - [hooks/pre_tool_enforcer.py](hooks/pre_tool_enforcer.py) intercepts proposed code edits and shell commands.
-   - Evaluates risk in ~30ms. If dangerous queries, hardcoded secrets, or policy violations exceed `>= 80%` certainty, execution blocks immediately (`allow_tool: false`).
+   - [hooks/pre_tool_enforcer.py](hooks/pre_tool_enforcer.py) intercepts proposed code edits and shell commands in ~36ms on GPU.
+   - **Policy Enforcement**: Blocks hardcoded secrets, raw SQL, and destructive commands (`allow_tool: false`).
+   - **Loop Detection**: Halts runaway agent loops if identical tool calls are repeated `>= 3x`.
 3. **After Tool Execution (`PostToolUse`)**:
    - [hooks/post_tool_judge.py](hooks/post_tool_judge.py) inspects newly written code and flags logic lacking test coverage.
 
