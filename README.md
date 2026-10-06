@@ -1,6 +1,6 @@
 # sys1-helper
 
-Local System 1 decision engine for `agy-cli` and `Claude Code` agents powered by [Laya](https://github.com/NandhaKishorM/laya).
+Local System 1 decision engine for `agy-cli` and `Claude Code` coding agents powered by [Laya](https://github.com/NandhaKishorM/laya).
 
 Provides sub-30ms offline policy enforcement, intent routing, test coverage judgment, and context compaction before running slow, expensive LLM calls.
 
@@ -46,10 +46,10 @@ make stop
 
 ## 2. Integration & Getting Started
 
-Choose your primary agent workflow below:
+Choose your coding agent below:
 
 <details>
-<summary><strong>Option A: Google Antigravity (agy-cli) Setup</strong></summary>
+<summary><strong>Google Antigravity (agy-cli)</strong></summary>
 
 <br>
 
@@ -90,7 +90,7 @@ agy
 </details>
 
 <details>
-<summary><strong>Option B: Claude Code Setup</strong></summary>
+<summary><strong>Claude Code</strong></summary>
 
 <br>
 
@@ -116,10 +116,14 @@ Alternatively, add it directly to your Claude Code settings or project `.claude.
 }
 ```
 
-### Step 2: Add Reflex Rules (`CLAUDE.md`)
-Copy `CLAUDE.md` to your target project root so Claude automatically triggers System 1 tools reflexively:
+### Step 2: Add Reflex Rules to `CLAUDE.md`
+To ensure Claude automatically triggers System 1 tools reflexively, append or copy the reflex instructions into your project's `CLAUDE.md`:
 
 ```bash
+# If CLAUDE.md already exists in your project, append the rules:
+cat /path/to/sys1-helper/CLAUDE.md >> /path/to/your-target-project/CLAUDE.md
+
+# If starting fresh without an existing CLAUDE.md:
 cp /path/to/sys1-helper/CLAUDE.md /path/to/your-target-project/CLAUDE.md
 ```
 
@@ -180,23 +184,22 @@ python skills/laya-grep/run.py "detect infinite loop" lib/
 
 ---
 
-## 4. Core Engine Capabilities & Token Savings (`lib/`)
+## 4. Core System 1 Decision Tools & Token Savings
 
-Each module offloads specialized binary or classification decisions from expensive frontier LLMs to the local Laya engine (<50ms on GPU):
+Each tool offloads specialized binary or classification decisions from expensive frontier LLMs to the local Laya engine (<50ms on GPU):
 
-| Module | Core Capability | Time & Token Savings |
+| Tool / Decision Engine | Core Capability | Time & Token Savings |
 | :--- | :--- | :--- |
-| **`lib/rule_enforcer.py`** | Intercepts dangerous edits, raw secrets, unescaped SQL, and destructive shell commands (`rm -rf`) before execution. | **~50ms locally vs ~1,600ms LLM roundtrip**. Saves **~750 tokens per tool call**; prevents catastrophic silent leaks. |
-| **`lib/surgical_retrieval.py`** (`jevgrep`) | Splits code files into overlapping sliding windows (20–30 lines) and extracts only strictly relevant snippets. | **Cuts context consumption by 70–90%**. Injects ~200 tokens of relevant lines instead of 2,000+ token full file dumps. |
-| **`lib/compaction.py`** | Scans session transcripts and build logs, classifying progress noise vs retainable state (errors, assertions). | **Prunes 80–90% of terminal noise** locally in milliseconds. Prevents multi-thousand-token log dumps from slowing subsequent turns. |
-| **`lib/skill_picker.py`** | Automatically maps user prompts to specialized skills (`/fast_explore`, `/review_gate`, `/compact`, `/laya-grep`). | **Routes in ~50–130ms with 0 tokens**. Bypasses expensive multi-turn frontier LLM planning (~1,400ms and ~500 tokens). |
-| **`lib/loop_detector.py`** | Tracks action history to detect repetitive tool calls (>=3x identical actions) and evaluates output rubrics. | **Instantly halts runaway agent loops**, saving tens of thousands of wasted tokens and minutes of stuck retries. |
-| **`lib/file_ranker.py`** | Scores and reranks candidate file paths found by `find` or `rg` based on semantic intent. | Ensures the agent opens only the top 1–2 target files, **saving up to 80% of speculative file-reading tokens**. |
-| **`lib/memory_gate.py`** | Evaluates post-task traces to filter disposable task details from permanent guidelines (`rule`, `architecture`, `gotcha`). | Prevents permanent memory and rules from accumulating noise, keeping long-term retrieval prompts lean and high-signal. |
-| **`lib/review_gate.py`** | 7-point PR/diff risk gate (API breaks, security injections, leaks, perf regressions, test gaps, unhandled panics, schema breaks). | Delivers instant pass/fail risk audits in **sub-second time**, reducing repetitive full-diff reviews by frontier models. |
-| **`lib/judge.py`** | Evaluates code diffs immediately after tool execution to detect newly introduced logic lacking test coverage. | Flags test gaps in **~40ms**, catching omissions early before expensive downstream test and fix cycles. |
-| **`lib/browser_nav.py`** | Scores interactive DOM elements (buttons, inputs, links) to pick the exact target satisfying the user goal. | Eliminates transmitting massive 10,000+ token raw HTML dumps to the LLM; ranks candidates locally. |
-| **`lib/client.py`** | Lightweight, persistent HTTP connection pool linking hooks and skills to the resident Laya daemon using zero-dependency standard library (`urllib`). | Sub-millisecond IPC with zero process boot overhead; keeps single model loaded in GPU memory. |
+| **`sys1_check_violations`** (Rule Guardrail) | Intercepts dangerous edits, raw secrets, unescaped SQL, and destructive shell commands (`rm -rf`) before execution. | **~50ms locally vs ~1,600ms LLM roundtrip**. Saves **~750 tokens per tool call**; prevents catastrophic silent leaks. |
+| **`sys1_grep`** (Surgical Retrieval / jevgrep) | Splits code files into overlapping sliding windows (20–30 lines) and extracts only strictly relevant snippets. | **Cuts context consumption by 70–90%**. Injects ~200 tokens of relevant lines instead of 2,000+ token full file dumps. |
+| **`sys1_compact`** (Context Compactor) | Scans session transcripts and build logs, classifying progress noise vs retainable state (errors, assertions). | **Prunes 80–90% of terminal noise** locally in milliseconds. Prevents multi-thousand-token log dumps from slowing subsequent turns. |
+| **`sys1_rank_files`** (File Path Ranker) | Scores and reranks candidate file paths found by `find` or `rg` based on semantic intent. | Ensures the agent opens only the top 1–2 target files, **saving up to 80% of speculative file-reading tokens**. |
+| **`sys1_review_gate`** (7-Point Risk Gate) | 7-point PR/diff risk gate (API breaks, security injections, leaks, perf regressions, test gaps, unhandled panics, schema breaks). | Delivers instant pass/fail risk audits in **sub-second time**, reducing repetitive full-diff reviews by frontier models. |
+| **`sys1_judge_coverage`** (Test Coverage Judge) | Evaluates code diffs immediately after tool execution to detect newly introduced logic lacking test coverage. | Flags test gaps in **~40ms**, catching omissions early before expensive downstream test and fix cycles. |
+| **`sys1_memory_gate`** (Memory Promotion Gate) | Evaluates post-task traces to filter disposable task details from permanent guidelines (`rule`, `architecture`, `gotcha`). | Prevents permanent memory and rules from accumulating noise, keeping long-term retrieval prompts lean and high-signal. |
+| **Skill & Intent Router** | Automatically maps user prompts to specialized skills (`/fast_explore`, `/review_gate`, `/compact`, `/laya-grep`). | **Routes in ~50–130ms with 0 tokens**. Bypasses expensive multi-turn frontier LLM planning (~1,400ms and ~500 tokens). |
+| **Agent Loop Detector** | Tracks action history to detect repetitive tool calls (>=3x identical actions) and halts runaway retries. | **Instantly halts runaway agent loops**, saving tens of thousands of wasted tokens and minutes of stuck retries. |
+| **DOM Element Selector** | Scores interactive DOM elements (buttons, inputs, links) to pick the exact target satisfying the user goal. | Eliminates transmitting massive 10,000+ token raw HTML dumps to the LLM; ranks candidates locally. |
 
 ---
 
