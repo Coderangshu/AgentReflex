@@ -42,19 +42,21 @@ class TestMCPServer(unittest.TestCase):
         res = self.rpc("tools/list")
         tools = res["result"]["tools"]
         tool_names = [t["name"] for t in tools]
-        self.assertEqual(len(tool_names), 7)
-        self.assertIn("sys1_check_violations", tool_names)
-        self.assertIn("sys1_grep", tool_names)
-        self.assertIn("sys1_review_gate", tool_names)
-        self.assertIn("sys1_compact", tool_names)
-        self.assertIn("sys1_rank_files", tool_names)
-        self.assertIn("sys1_judge_coverage", tool_names)
-        self.assertIn("sys1_memory_gate", tool_names)
+        self.assertEqual(len(tool_names), 9)
+        self.assertIn("reflex_check_violations", tool_names)
+        self.assertIn("reflex_grep", tool_names)
+        self.assertIn("reflex_review_gate", tool_names)
+        self.assertIn("reflex_compact", tool_names)
+        self.assertIn("reflex_rank_files", tool_names)
+        self.assertIn("reflex_judge_coverage", tool_names)
+        self.assertIn("reflex_memory_gate", tool_names)
+        self.assertIn("reflex_prune_trajectory", tool_names)
+        self.assertIn("reflex_trajectory_governor", tool_names)
 
     def test_call_check_violations(self):
         res = self.rpc(
             "tools/call",
-            {"name": "sys1_check_violations", "arguments": {"content": "const x = 1;"}},
+            {"name": "reflex_check_violations", "arguments": {"content": "const x = 1;"}},
         )
         data = json.loads(res["result"]["content"][0]["text"])
         self.assertIn("violates", data)

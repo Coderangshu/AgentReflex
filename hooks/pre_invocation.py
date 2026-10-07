@@ -7,12 +7,13 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from lib.skill_picker import pick_skill
 from lib.compaction import score_message_retention
+from lib.trajectory_pruner import prune_trajectory
 
 AUTO_COMPACT_SIZE_THRESHOLD_BYTES = 50 * 1024  # 50 KB
 
 
 def compact_recent_transcript(transcript_path_str: str) -> dict:
-    """Read transcript, score noisy blocks using Laya, and return compacted context if bloated."""
+    """Read transcript, run semantic trajectory pruning, and return compacted context if bloated."""
     if not transcript_path_str:
         return {}
 
@@ -25,54 +26,51 @@ def compact_recent_transcript(transcript_path_str: str) -> dict:
         if file_size < AUTO_COMPACT_SIZE_THRESHOLD_BYTES:
             return {}
 
-        total_steps = 0
-        pruned_steps = 0
-        kept_summaries = []
-
+        raw_steps = []
         with open(tpath, "r", encoding="utf-8", errors="replace") as f:
-            for line in f:
+            for idx, line in enumerate(f):
                 line = line.strip()
                 if not line:
                     continue
-                total_steps += 1
                 try:
                     data = json.loads(line)
+                    raw_steps.append({
+                        "step_index": data.get("step_index", idx + 1),
+                        "type": data.get("type", "UNKNOWN"),
+                        "tool_name": data.get("tool_name", ""),
+                        "content": data.get("content", ""),
+                    })
                 except Exception:
                     continue
 
-                step_type = data.get("type", "")
-                content = data.get("content", "")
+        if not raw_steps:
+            return {}
 
-                # Always keep user prompts
-                if step_type in ("USER_INPUT", "USER_EXPLICIT"):
-                    continue
+        # Run semantic trajectory pruner (AgentDiet)
+        res = prune_trajectory(raw_steps)
+        pruned_count = res.get("pruned_steps", 0)
+        total_steps = res.get("total_steps", len(raw_steps))
 
-                if not content:
-                    continue
-
-                score_res = score_message_retention(content)
-                if score_res.get("should_prune", False):
-                    pruned_steps += 1
-                else:
-                    # Keep concise snippet of essential step
-                    snippet = content[:150].replace("\n", " ").strip()
-                    if snippet:
-                        kept_summaries.append(f"Step {data.get('step_index', total_steps)}: {snippet}")
-
-        if pruned_steps > 0:
-            sample_kept = kept_summaries[-5:]  # Keep last 5 essential points
+        if pruned_count > 0:
+            kept = res.get("active_steps", [])
+            sample_kept = [
+                f"Step {s.get('step_index')}: {s.get('content', '')[:120].replace(chr(10), ' ').strip()}"
+                for s in kept[-5:]
+                if s.get("content")
+            ]
             summary_text = (
-                f"[AgentReflex Auto-Compaction]: Pruned {pruned_steps}/{total_steps} noise steps "
-                f"from active transcript ({file_size // 1024}KB -> lean memory). "
-                f"Essential context: {' | '.join(sample_kept) if sample_kept else 'Clean state preserved'}."
+                f"[AgentReflex Trajectory Pruner]: Pruned {pruned_count}/{total_steps} obsolete/noise steps "
+                f"({res.get('reduction_pct', 0)}% reduction, {file_size // 1024}KB file). "
+                f"Active state: {' | '.join(sample_kept) if sample_kept else 'Clean context preserved'}."
             )
             return {
                 "active": True,
                 "summary": summary_text,
-                "pruned_steps": pruned_steps,
+                "pruned_steps": pruned_count,
             }
         return {}
     except Exception:
+        return {}
         return {}
 
 

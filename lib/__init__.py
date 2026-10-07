@@ -1,4 +1,4 @@
-"""Core logic library for sys1-helper."""
+"""Core logic library for AgentReflex."""
 
 from lib.client import query_laya, is_daemon_alive
 from lib.compaction import score_message_retention, should_prune
@@ -11,6 +11,8 @@ from lib.rule_enforcer import check_violations
 from lib.memory_gate import judge_memory_promotion
 from lib.loop_detector import check_agent_loop, evaluate_task_output
 from lib.surgical_retrieval import surgical_search, chunk_file
+from lib.trajectory_pruner import prune_trajectory, classify_trajectory_step, prune_transcript_file
+from lib.warden_governor import score_forward_progress, evaluate_trajectory_governor
 
 __all__ = [
     "query_laya",
@@ -28,4 +30,9 @@ __all__ = [
     "evaluate_task_output",
     "surgical_search",
     "chunk_file",
+    "prune_trajectory",
+    "classify_trajectory_step",
+    "prune_transcript_file",
+    "score_forward_progress",
+    "evaluate_trajectory_governor",
 ]

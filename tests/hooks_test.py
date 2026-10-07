@@ -55,7 +55,7 @@ class TestHooks(unittest.TestCase):
             data = json.loads(proc.stdout)
             self.assertIn("additionalContext", data)
             # Verify compaction notice was injected
-            self.assertIn("Auto-Compaction", data["additionalContext"])
+            self.assertIn("Trajectory Pruner", data["additionalContext"])
         finally:
             tf_path.unlink()
 

@@ -58,11 +58,11 @@ Attach native hooks and skills to any project where you run `agy`:
 
 ```bash
 cd /path/to/your-target-project
-/path/to/sys1-helper/scripts/install_hooks.sh .
+/path/to/AgentReflex/scripts/install_hooks.sh .
 ```
 
 > **How it works under the hood**:
-> `install_hooks.sh` automatically detects the `.venv/bin/python` interpreter inside `sys1-helper` and binds it explicitly inside `.agents/hooks.json`. This guarantees `agy-cli` runs the hooks in `sys1-helper`'s isolated environment without polluting or conflicting with your target project's Python version, Node runtime, or dependencies.
+> `install_hooks.sh` automatically detects the `.venv/bin/python` interpreter inside `AgentReflex` and binds it explicitly inside `.agents/hooks.json`. This guarantees `agy-cli` runs the hooks in `AgentReflex`'s isolated environment without polluting or conflicting with your target project's Python version, Node runtime, or dependencies.
 
 This creates `.agents/` inside the target directory:
 - **`.agents/hooks.json`**: Configures `PreInvocation`, `PreToolUse`, and `PostToolUse` hooks pointing to `agentreflex/.venv/bin/python`.
@@ -124,18 +124,20 @@ To ensure Claude automatically triggers System 1 tools reflexively, append or co
 cat /path/to/sys1-helper/CLAUDE.md >> /path/to/your-target-project/CLAUDE.md
 
 # If starting fresh without an existing CLAUDE.md:
-cp /path/to/sys1-helper/CLAUDE.md /path/to/your-target-project/CLAUDE.md
+cp /path/to/agentreflex/CLAUDE.md /path/to/your-target-project/CLAUDE.md
 ```
 
-### Exposed MCP Tools (7 Core Modules)
-Once registered, Claude Code has instant access to 7 System 1 tools:
-- **`sys1_check_violations`**: Pre-action guardrail checking code edits and shell commands for secrets, destructive `rm -rf`, and database drops before running them.
-- **`sys1_grep`**: Surgical context retrieval (`jevgrep`). Chunks target files into 20–30 line windows, scores them locally via Laya in ~30ms, and returns only strictly relevant snippets.
-- **`sys1_review_gate`**: 7-point PR / diff risk audit across API breaks, injections, leaks, perf regressions, test gaps, unhandled errors, and contract violations.
-- **`sys1_compact`**: Scores terminal output or conversation logs to distinguish disposable noise from retainable state.
-- **`sys1_rank_files`**: Reranks candidate file paths by semantic relevance to a task intent.
-- **`sys1_judge_coverage`**: Evaluates newly modified code to check if unit tests are required.
-- **`sys1_memory_gate`**: Filters post-task lessons, ensuring only durable patterns (`rule`, `architecture`, `gotcha`) are stored in long-term memory.
+### Exposed MCP Tools (9 Core Modules)
+Once registered, Claude Code has instant access to 9 System 1 tools:
+- **`reflex_check_violations`**: Pre-action guardrail checking code edits and shell commands for secrets, destructive `rm -rf`, and database drops before running them.
+- **`reflex_grep`**: Surgical context retrieval (`jevgrep`). Chunks target files into 20–30 line windows, scores them locally via Laya in ~30ms, and returns only strictly relevant snippets.
+- **`reflex_review_gate`**: 7-point PR / diff risk audit across API breaks, injections, leaks, perf regressions, test gaps, unhandled errors, and contract violations.
+- **`reflex_compact`**: Scores terminal output or conversation logs to distinguish disposable noise from retainable state.
+- **`reflex_rank_files`**: Reranks candidate file paths by semantic relevance to a task intent.
+- **`reflex_judge_coverage`**: Evaluates newly modified code to check if unit tests are required.
+- **`reflex_memory_gate`**: Filters post-task lessons, ensuring only durable patterns (`rule`, `architecture`, `gotcha`) are stored in long-term memory.
+- **`reflex_prune_trajectory`**: Multi-turn conversation history pruner (AgentDiet). Strips obsolete resolved errors and diagnostic noise while preserving active state.
+- **`reflex_trajectory_governor`**: Trajectory velocity and tool budget governor (Warden Governor). Halts unproductive exploration spirals and enforces budget limits.
 
 </details>
 
@@ -186,20 +188,22 @@ python skills/reflex-grep/run.py "detect infinite loop" lib/
 
 ## 4. Core System 1 Decision Tools & Token Savings
 
-Each tool offloads specialized binary or classification decisions from expensive frontier LLMs to the local Laya engine (<50ms on GPU):
+Each tool offloads specialized binary (`true`/`false`) or discrete classification decisions from expensive frontier LLMs to the local Laya engine (<50ms on GPU). The exact criteria, question modes, and decision thresholds are detailed below:
 
-| Tool / Decision Engine | Core Capability | Time & Token Savings |
-| :--- | :--- | :--- |
-| **`sys1_check_violations`** (Rule Guardrail) | Intercepts dangerous edits, raw secrets, unescaped SQL, and destructive shell commands (`rm -rf`) before execution. | **~50ms locally vs ~1,600ms LLM roundtrip**. Saves **~750 tokens per tool call**; prevents catastrophic silent leaks. |
-| **`sys1_grep`** (Surgical Retrieval / jevgrep) | Splits code files into overlapping sliding windows (20–30 lines) and extracts only strictly relevant snippets. | **Cuts context consumption by 70–90%**. Injects ~200 tokens of relevant lines instead of 2,000+ token full file dumps. |
-| **`sys1_compact`** (Context Compactor) | Scans session transcripts and build logs, classifying progress noise vs retainable state (errors, assertions). | **Prunes 80–90% of terminal noise** locally in milliseconds. Prevents multi-thousand-token log dumps from slowing subsequent turns. |
-| **`sys1_rank_files`** (File Path Ranker) | Scores and reranks candidate file paths found by `find` or `rg` based on semantic intent. | Ensures the agent opens only the top 1–2 target files, **saving up to 80% of speculative file-reading tokens**. |
-| **`sys1_review_gate`** (7-Point Risk Gate) | 7-point PR/diff risk gate (API breaks, security injections, leaks, perf regressions, test gaps, unhandled panics, schema breaks). | Delivers instant pass/fail risk audits in **sub-second time**, reducing repetitive full-diff reviews by frontier models. |
-| **`sys1_judge_coverage`** (Test Coverage Judge) | Evaluates code diffs immediately after tool execution to detect newly introduced logic lacking test coverage. | Flags test gaps in **~40ms**, catching omissions early before expensive downstream test and fix cycles. |
-| **`sys1_memory_gate`** (Memory Promotion Gate) | Evaluates post-task traces to filter disposable task details from permanent guidelines (`rule`, `architecture`, `gotcha`). | Prevents permanent memory and rules from accumulating noise, keeping long-term retrieval prompts lean and high-signal. |
-| **Skill & Intent Router** | Automatically maps user prompts to specialized skills (`/fast_explore`, `/review_gate`, `/compact`, `/laya-grep`). | **Routes in ~50–130ms with 0 tokens**. Bypasses expensive multi-turn frontier LLM planning (~1,400ms and ~500 tokens). |
-| **Agent Loop Detector** | Tracks action history to detect repetitive tool calls (>=3x identical actions) and halts runaway retries. | **Instantly halts runaway agent loops**, saving tens of thousands of wasted tokens and minutes of stuck retries. |
-| **DOM Element Selector** | Scores interactive DOM elements (buttons, inputs, links) to pick the exact target satisfying the user goal. | Eliminates transmitting massive 10,000+ token raw HTML dumps to the LLM; ranks candidates locally. |
+| Tool / Decision Engine | Classification Basis & Decision Threshold (`true` / `false`) | Output Type | Time & Token Savings |
+| :--- | :--- | :--- | :--- |
+| **`reflex_check_violations`**<br>([`lib/rule_enforcer.py`](file:///Users/angshuman/git/AgentReflex/lib/rule_enforcer.py)) | **Boolean (`noul` >= 0.80)**: Evaluates code edit/command against safety rules (plaintext secrets, credentials, `rm -rf`, DROP DB). **`violates = true`** if certainty >= 80%. | Boolean flag + score | **~50ms locally vs ~1,600ms LLM roundtrip**. Saves **~750 tokens per tool call**; prevents catastrophic leaks. |
+| **`reflex_grep`**<br>([`lib/surgical_retrieval.py`](file:///Users/angshuman/git/AgentReflex/lib/surgical_retrieval.py)) | **Boolean (`noul` >= 0.70)**: Evaluates 20–30 line sliding windows against target query (*"Does this snippet directly answer, define, or implement logic for '{query}'?"*). Matches scored above threshold are kept. | Ranked snippet list | **Cuts context by 70–90%**. Injects ~200 tokens of relevant lines instead of 2,000+ token full file dumps. |
+| **`reflex_compact`**<br>([`lib/compaction.py`](file:///Users/angshuman/git/AgentReflex/lib/compaction.py)) | **Boolean (`should_prune = true`)**: Triggers if regex matches progress bars/downloads OR neural scores meet: `(noise_score > 0.65 and keep_score < 0.35) or noise_score >= 0.80`. | Boolean flag + noise/keep scores | **Prunes 80–90% of terminal noise** locally. Prevents multi-thousand-token log dumps from bloating context. |
+| **`reflex_prune_trajectory`**<br>([`lib/trajectory_pruner.py`](file:///Users/angshuman/git/AgentReflex/lib/trajectory_pruner.py)) | **Multi-class choice + threshold**: Compares past steps against future steps to classify category:<br>• `obsolete_error`: choice `resolved_past_error` with conf >= 0.65 (`should_prune = true`)<br>• `transient_listing`: `is_transient_search` noul >= 0.70 or progress regex (`should_prune = true`)<br>• `durable_state`: default (`should_prune = false`). | Step category + boolean prune flag | **Cuts multi-turn context by 35%–75%**, eliminating stale error distraction across multi-turn agent sessions. |
+| **`reflex_rank_files`**<br>([`lib/file_ranker.py`](file:///Users/angshuman/git/AgentReflex/lib/file_ranker.py)) | **Continuous score (`noul`)**: Evaluates candidate file path against intent (*"Is candidate file highly relevant to '{intent}'?"*). Sorted descending, top-K paths returned. | Ranked `(file, score)` pairs | Ensures agent opens only top 1–2 target files, **saving up to 80% speculative file-reading tokens**. |
+| **`reflex_review_gate`**<br>([`lib/review_gate.py`](file:///Users/angshuman/git/AgentReflex/lib/review_gate.py)) | **Boolean 7-point audit (`passed = true/false`)**: Tests 7 dimensions with `noul` (API break, security injection, secrets leak, perf regression, test gap, unhandled exception, contract violation). **`passed = false`** if *any* dimension >= 0.70 risk threshold. | Boolean pass/fail + flagged risks | Instant risk audits in **sub-second time**, replacing slow and repetitive full-diff reviews by frontier models. |
+| **`reflex_judge_coverage`**<br>([`lib/judge.py`](file:///Users/angshuman/git/AgentReflex/lib/judge.py)) | **Boolean (`requires_verification = true`)**: Calculates `uncovered_risk = max(0.0, needs_tests - (is_test_file * 0.8))`. Flags **`true`** if `uncovered_risk >= 0.70`. | Boolean flag + risk score | Flags test gaps in **~40ms**, catching omissions early before expensive downstream test and fix cycles. |
+| **`reflex_memory_gate`**<br>([`lib/memory_gate.py`](file:///Users/angshuman/git/AgentReflex/lib/memory_gate.py)) | **Composite boolean (`should_promote = true`)**: Requires `should_promote` noul >= 0.70 **AND** category choice != `ephemeral` (must be `rule`, `architecture`, or `gotcha`). | Boolean promotion + category | Prevents permanent memory from accumulating noise; keeps long-term retrieval lean and high-signal. |
+| **Skill & Intent Router**<br>([`lib/skill_picker.py`](file:///Users/angshuman/git/AgentReflex/lib/skill_picker.py)) | **Multi-class choice + confidence**: Selects target skill (`fast_explore`, `review_gate`, `compact`, `none`). **`is_recommended = true`** if choice != `none` and `confidence > 0.65`. | Skill choice + recommendation flag | **Routes in ~50–130ms with 0 tokens**. Bypasses expensive multi-turn frontier LLM planning (~1,400ms / ~500 tokens). |
+| **Agent Loop Detector**<br>([`lib/loop_detector.py`](file:///Users/angshuman/git/AgentReflex/lib/loop_detector.py)) | **Deterministic + neural (`is_looping = true`)**: Flags **`true`** immediately if >= 3 identical consecutive actions; or if error present and neural `is_stuck` noul >= 0.99. | Boolean loop flag + reason | **Instantly halts runaway loops**, saving tens of thousands of wasted tokens and stuck retry cycles. |
+| **Trajectory & Tool Budget Governor**<br>([`lib/warden_governor.py`](file:///Users/angshuman/git/AgentReflex/lib/warden_governor.py)) | **Multi-factor threshold (`allow_action = false`)**: Intercepts if tool calls >= 25, tokens >= 120,000, identical action loops >= 3, or neural velocity choice `spinning_wheels`/`deviating` (conf >= 0.65) while budget > 60%. | Boolean allow/deny + budget metrics | **Eliminates runaway exploration spirals**, saving tens of thousands of wasted tokens and runaway LLM billing. |
+| **DOM Element Selector**<br>([`lib/browser_nav.py`](file:///Users/angshuman/git/AgentReflex/lib/browser_nav.py)) | **Multi-candidate choice**: Scores all candidate interactive DOM elements against navigation goal. Returns candidate with highest confidence; returns `None` if `none` wins. | Selected DOM node + confidence | Eliminates sending massive 10,000+ token raw HTML dumps to LLM; picks targets locally in ~40ms. |
 
 ---
 

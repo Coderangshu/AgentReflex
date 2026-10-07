@@ -91,7 +91,7 @@ def main():
         print_status("4. Intent / Skill Router", False, str(e))
 
     # 5. Surgical Context Retrieval (jevgrep)
-    code, out_grep, _ = run_cmd([PYTHON, "skills/reflex-grep/run.py", "predict lock thread", "daemon/server.py"])
+    code, out_grep, _ = run_cmd([PYTHON, "skills/reflex-grep/run.py", "predict lock", "daemon/server.py"])
     try:
         res_grep = json.loads(out_grep)
         matches = res_grep.get("matches_count", 0)
@@ -122,6 +122,23 @@ def main():
     ]
     loop_res = check_agent_loop(stuck_actions)
     print_status("7. Infinite Loop Detector", loop_res["is_looping"], loop_res["reason"][:70])
+
+    # 8. Trajectory & Tool Budget Governor (Warden Governor)
+    from lib.warden_governor import evaluate_trajectory_governor
+    gov_res = evaluate_trajectory_governor(
+        task_goal="Fix database connection timeout error",
+        recent_actions=[
+            {"tool": "run_command", "args": {"command": "ls -la /tmp"}},
+            {"tool": "run_command", "args": {"command": "ps aux"}},
+            {"tool": "run_command", "args": {"command": "cat /etc/hosts"}},
+        ],
+        proposed_tool="run_command",
+        proposed_args={"command": "uname -a"},
+        total_tool_calls=18,
+        max_tool_calls=25,
+    )
+    gov_pass = (not gov_res["allow_action"]) and gov_res["is_stalled"]
+    print_status("8. Trajectory Budget Governor", gov_pass, f"status: {gov_res['governor_status']} ({gov_res['reason'][:60]})")
 
     print(f"\n{BOLD}=== Simulation Complete ==={RESET}\n")
 
