@@ -94,38 +94,35 @@ agy
 
 <br>
 
-Claude Code interacts with `sys1-helper` via Model Context Protocol (MCP) using a standard-library JSON-RPC 2.0 stdio server (`mcp/server.py`).
+Claude Code uses AgentReflex in two ways: an MCP server (`mcp/server.py`) that exposes the `reflex_*` tools, and hooks (`hooks/claude_code_hook.py`) that run automatically on tool use. Both talk to the local daemon (`make start`).
 
-### Step 1: Register MCP Server in Claude Code
-Register the `agentreflex` MCP server with Claude Code either globally or for a specific project:
-
+### One-command install
 ```bash
-# Add to Claude Code MCP registry
-claude mcp add agentreflex /path/to/agentreflex/.venv/bin/python /path/to/agentreflex/mcp/server.py
+# Every project (writes ~/.claude/settings.json, ~/.claude/CLAUDE.md, user-scope MCP)
+/path/to/AgentReflex/scripts/install_claude_code.sh --user
+
+# Or a single project (writes <project>/.claude/settings.json, <project>/CLAUDE.md, project-scope MCP)
+/path/to/AgentReflex/scripts/install_claude_code.sh /path/to/your-target-project
 ```
+The script is idempotent. It (1) registers the `agentreflex` MCP server, (2) merges the hooks into `settings.json` without touching your other settings, and (3) appends the reflex rules from `CLAUDE.md` once. Restart Claude Code afterwards and check `/mcp` and `/hooks`.
 
-Alternatively, add it directly to your Claude Code settings or project `.claude.json`:
-```json
-{
-  "mcpServers": {
-    "agentreflex": {
-      "command": "/path/to/agentreflex/.venv/bin/python",
-      "args": ["/path/to/agentreflex/mcp/server.py"]
-    }
-  }
-}
-```
+> **Note**: a plain `claude mcp add` (no `-s user`) registers the server for the current directory only, so other projects won't see it.
 
-### Step 2: Add Reflex Rules to `CLAUDE.md`
-To ensure Claude automatically triggers System 1 tools reflexively, append or copy the reflex instructions into your project's `CLAUDE.md`:
+### Hooks (automatic)
+| Event | Matcher | Behavior |
+| :--- | :--- | :--- |
+| `PreToolUse` | `Bash`, `Write`, `Edit`, `MultiEdit` | Checks commands and edits against the safety policy. On a violation it prompts you to confirm (`ask`) rather than hard-blocking. File edits get a deterministic secret-pattern check first. The model only judges edits of 200+ characters, because it over-scores short snippets. |
+| `PostToolUse` | `Write`, `Edit`, `MultiEdit` | Tells Claude when newly written logic likely needs tests (`reflex_judge_coverage`). |
+| `UserPromptSubmit` | all | Routes the prompt and tells Claude which `reflex_*` tool fits (explore / review / compact). |
 
+The hooks fail open: if the daemon is down or errors, Claude proceeds normally. The loop and budget governor is not run as a hook, because normal Claude Code sessions routinely exceed its 25-call budget. Claude can call `reflex_trajectory_governor` itself.
+
+### Manual MCP registration
 ```bash
-# If CLAUDE.md already exists in your project, append the rules:
-cat /path/to/sys1-helper/CLAUDE.md >> /path/to/your-target-project/CLAUDE.md
-
-# If starting fresh without an existing CLAUDE.md:
-cp /path/to/agentreflex/CLAUDE.md /path/to/your-target-project/CLAUDE.md
+claude mcp add -s user agentreflex -- /path/to/AgentReflex/.venv/bin/python /path/to/AgentReflex/mcp/server.py
 ```
+The `CLAUDE.md` rules (what makes Claude call the tools proactively) are in this repo's `CLAUDE.md`. Append them to your project's or `~/.claude/CLAUDE.md`.
+
 
 ### Exposed MCP Tools (9 Core Modules)
 Once registered, Claude Code has instant access to 9 System 1 tools:

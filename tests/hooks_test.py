@@ -79,6 +79,26 @@ class TestHooks(unittest.TestCase):
         self.assertTrue(data.get("allow_tool", False))
         self.assertEqual(data.get("decision"), "allow")
 
+    def _run_pre_tool(self, args, name="edit_file"):
+        proc = subprocess.run(
+            [PYTHON, str(ROOT / "hooks" / "pre_tool_enforcer.py")],
+            input=json.dumps({"toolCall": {"name": name, "args": args}}),
+            capture_output=True,
+            text=True,
+            cwd=str(ROOT),
+        )
+        self.assertEqual(proc.returncode, 0)
+        return json.loads(proc.stdout)
+
+    def test_pre_tool_enforcer_denies_hardcoded_secret_edit(self):
+        data = self._run_pre_tool({"content": 'password = "hunter2hunter2"'})
+        self.assertFalse(data["allow_tool"])
+        self.assertEqual(data["decision"], "deny")
+
+    def test_pre_tool_enforcer_denies_destructive_command(self):
+        data = self._run_pre_tool({"commandLine": "rm -rf / --no-preserve-root"}, name="run_command")
+        self.assertFalse(data["allow_tool"])
+
     def test_post_tool_judge_hook(self):
         hook_path = ROOT / "hooks" / "post_tool_judge.py"
         payload = json.dumps({

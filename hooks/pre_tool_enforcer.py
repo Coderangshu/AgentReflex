@@ -6,6 +6,7 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from lib.rule_enforcer import check_violations
+from lib.secret_scan import has_hardcoded_secret, MIN_EDIT_CHARS_FOR_MODEL, SECRET_REASON
 from lib.loop_detector import check_agent_loop
 from lib.warden_governor import evaluate_trajectory_governor
 
@@ -90,19 +91,37 @@ def main():
             return
 
         # 2. Extract modified code or command across standard parameter names
-        content = (
+        command = args.get("commandLine") or args.get("CommandLine") or ""
+        edit = (
             args.get("content")
             or args.get("patch")
-            or args.get("commandLine")
-            or args.get("CommandLine")
             or args.get("CodeContent")
             or args.get("ReplacementContent")
             or ""
         )
+        content = command or edit
 
         if not content:
             print(json.dumps({"decision": "allow", "allow_tool": True}))
             return
+
+        if not command:
+            # File edit: deterministic secret check, and skip the model on short snippets it over-scores
+            if has_hardcoded_secret(edit):
+                print(
+                    json.dumps(
+                        {
+                            "decision": "deny",
+                            "reason": SECRET_REASON,
+                            "allow_tool": False,
+                            "deny_reason": SECRET_REASON,
+                        }
+                    )
+                )
+                return
+            if len(edit) < MIN_EDIT_CHARS_FOR_MODEL:
+                print(json.dumps({"decision": "allow", "allow_tool": True}))
+                return
 
         result = check_violations(content)
 
