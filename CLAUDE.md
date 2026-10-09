@@ -18,3 +18,6 @@ This project is connected to the local `AgentReflex` decision engine via MCP (`r
 
 ## 5. Memory & Learnings
 - Only promote durable guidelines (`rule`, `architecture`, `gotcha`) to permanent memory via `reflex_memory_gate`. Discard one-off task details.
+
+## 6. Task Completion Validation (Stop / Done Reflex)
+- Before concluding complex tasks or declaring victory, call `reflex_validate_done` with `{"task_goal": "...", "git_diff": "...", "test_output": "..."}` to verify all requirements are met and no broken tests or syntax errors remain.

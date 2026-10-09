@@ -30,6 +30,7 @@ from lib.judge import judge_test_coverage
 from lib.memory_gate import judge_memory_promotion
 from lib.trajectory_pruner import prune_trajectory
 from lib.warden_governor import evaluate_trajectory_governor
+from lib.done_validator import validate_task_completion
 from lib.client import is_daemon_alive
 
 logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
@@ -227,6 +228,35 @@ TOOLS = [
             "required": ["task_goal"],
         },
     },
+    {
+        "name": "reflex_validate_done",
+        "description": "Automated Stop/Done task completion validator. Analyzes user goal, accumulated git diff, and test output to verify if the task is genuinely complete or needs more work (preventing premature stopping or over-iteration).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task_goal": {
+                    "type": "string",
+                    "description": "User's stated goal or initial prompt",
+                },
+                "final_output": {
+                    "type": "string",
+                    "description": "Optional summary or explanation proposed by the agent",
+                    "default": "",
+                },
+                "git_diff": {
+                    "type": "string",
+                    "description": "Optional accumulated git diff of code changes",
+                    "default": "",
+                },
+                "test_output": {
+                    "type": "string",
+                    "description": "Optional output from test runs, linters, or builds",
+                    "default": "",
+                },
+            },
+            "required": ["task_goal"],
+        },
+    },
 ]
 
 
@@ -293,6 +323,19 @@ def handle_call_tool(name: str, arguments: dict) -> dict:
             proposed_tool=proposed_tool,
             total_tool_calls=total_tool_calls,
             max_tool_calls=max_tool_calls,
+        )
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+
+    elif name in ("reflex_validate_done", "sys1_validate_done"):
+        task_goal = arguments.get("task_goal", "")
+        final_output = arguments.get("final_output", "")
+        git_diff = arguments.get("git_diff", "")
+        test_output = arguments.get("test_output", "")
+        res = validate_task_completion(
+            task_goal=task_goal,
+            final_output=final_output,
+            git_diff=git_diff,
+            test_output=test_output,
         )
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 

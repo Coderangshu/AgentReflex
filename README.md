@@ -124,8 +124,8 @@ claude mcp add -s user agentreflex -- /path/to/AgentReflex/.venv/bin/python /pat
 The `CLAUDE.md` rules (what makes Claude call the tools proactively) are in this repo's `CLAUDE.md`. Append them to your project's or `~/.claude/CLAUDE.md`.
 
 
-### Exposed MCP Tools (9 Core Modules)
-Once registered, Claude Code has instant access to 9 System 1 tools:
+### Exposed MCP Tools (10 Core Modules)
+Once registered, Claude Code has instant access to 10 System 1 tools:
 - **`reflex_check_violations`**: Pre-action guardrail checking code edits and shell commands for secrets, destructive `rm -rf`, and database drops before running them.
 - **`reflex_grep`**: Surgical context retrieval (`jevgrep`). Chunks target files into 20–30 line windows, scores them locally via Laya in ~30ms, and returns only strictly relevant snippets.
 - **`reflex_review_gate`**: 7-point PR / diff risk audit across API breaks, injections, leaks, perf regressions, test gaps, unhandled errors, and contract violations.
@@ -135,6 +135,7 @@ Once registered, Claude Code has instant access to 9 System 1 tools:
 - **`reflex_memory_gate`**: Filters post-task lessons, ensuring only durable patterns (`rule`, `architecture`, `gotcha`) are stored in long-term memory.
 - **`reflex_prune_trajectory`**: Multi-turn conversation history pruner (AgentDiet). Strips obsolete resolved errors and diagnostic noise while preserving active state.
 - **`reflex_trajectory_governor`**: Trajectory velocity and tool budget governor (Warden Governor). Halts unproductive exploration spirals and enforces budget limits.
+- **`reflex_validate_done`**: Automated Stop/Done completion validator. Verifies diffs and test suites satisfy user objectives before concluding.
 
 </details>
 
@@ -200,6 +201,7 @@ Each tool offloads specialized binary (`true`/`false`) or discrete classificatio
 | **Skill & Intent Router**<br>([`lib/skill_picker.py`](file:///Users/angshuman/git/AgentReflex/lib/skill_picker.py)) | **Multi-class choice + confidence**: Selects target skill (`fast_explore`, `review_gate`, `compact`, `none`). **`is_recommended = true`** if choice != `none` and `confidence > 0.65`. | Skill choice + recommendation flag | **Routes in ~50–130ms with 0 tokens**. Bypasses expensive multi-turn frontier LLM planning (~1,400ms / ~500 tokens). |
 | **Agent Loop Detector**<br>([`lib/loop_detector.py`](file:///Users/angshuman/git/AgentReflex/lib/loop_detector.py)) | **Deterministic + neural (`is_looping = true`)**: Flags **`true`** immediately if >= 3 identical consecutive actions; or if error present and neural `is_stuck` noul >= 0.99. | Boolean loop flag + reason | **Instantly halts runaway loops**, saving tens of thousands of wasted tokens and stuck retry cycles. |
 | **Trajectory & Tool Budget Governor**<br>([`lib/warden_governor.py`](file:///Users/angshuman/git/AgentReflex/lib/warden_governor.py)) | **Multi-factor threshold (`allow_action = false`)**: Intercepts if tool calls >= 25, tokens >= 120,000, identical action loops >= 3, or neural velocity choice `spinning_wheels`/`deviating` (conf >= 0.65) while budget > 60%. | Boolean allow/deny + budget metrics | **Eliminates runaway exploration spirals**, saving tens of thousands of wasted tokens and runaway LLM billing. |
+| **Task Completion Validator**<br>([`lib/done_validator.py`](file:///Users/angshuman/git/AgentReflex/lib/done_validator.py)) | **Composite threshold (`is_complete = true`)**: Verifies code diff and test output fulfill user goal. Flags **`false`** if failing tests score >= 0.60, satisfaction < 0.40, or choice `needs_more_work`. | Boolean complete + missing gaps | **Prevents premature victory** and eliminates speculative over-iteration after tasks are finished. |
 | **DOM Element Selector**<br>([`lib/browser_nav.py`](file:///Users/angshuman/git/AgentReflex/lib/browser_nav.py)) | **Multi-candidate choice**: Scores all candidate interactive DOM elements against navigation goal. Returns candidate with highest confidence; returns `None` if `none` wins. | Selected DOM node + confidence | Eliminates sending massive 10,000+ token raw HTML dumps to LLM; picks targets locally in ~40ms. |
 
 ---

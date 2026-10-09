@@ -63,25 +63,26 @@ This roadmap tracks planned and partially implemented System 1 (sub-30ms local d
 
 ---
 
-## 4. Automated "Stop / Done" Validator `[PARTIALLY IMPLEMENTED]`
+## 4. Automated "Stop / Done" Validator `[IMPLEMENTED]`
 
-- **Status**: Partially Implemented
-  - *Current State*: `lib/loop_detector.py::evaluate_task_output()` evaluates single outputs against a rubric and goal for unhandled failures.
-  - *Missing*: Full session completion gate that intercepts the agent's stop signal and verifies accumulated git diffs + test suites before allowing completion.
+- **Status**: Implemented & Verified
+  - *Module*: `lib/done_validator.py`
+  - *MCP*: Exposed as `reflex_validate_done` in `mcp/server.py`
 - **Target Module**: `lib/done_validator.py`
 - **What Problem It Solves**:
   Autonomous coding agents suffer from two failure modes:
   1. **Premature Victory**: Declaring a task complete while broken tests or missing requirements remain.
   2. **Over-Iteration**: Continuing to run speculative edits after the task is already solved.
 - **System 1 Decision Logic**:
-  - **Input**: Initial user goal, accumulated git diff, latest test/build output.
-  - **Decision (`noul`)**:
-    - `TASK_COMPLETE`: All user objectives satisfied, tests passing, clean syntax.
-    - `NEEDS_MORE_WORK`: Critical criteria still missing or tests failing.
-  - **Action**: If `TASK_COMPLETE`, prompts agent to conclude immediately or halts autonomous loop.
+  - **Input**: Initial user goal, accumulated git diff, latest test/build output, and final summary.
+  - **Decision (`choice` + `noul`)**:
+    - `status`: Multi-choice classification (`task_complete`, `needs_more_work`, `unrelated_or_blocked`).
+    - `has_failing_tests`: Detects unhandled exceptions or failing assertions (`noul`).
+    - `satisfies_goal`: Evaluates goal fulfillment (`noul`).
+  - **Action**: Validates completion before session stop, catching omissions or halting runaway over-iteration.
 - **Latency & Impact**:
-  - ~35ms locally.
-  - Prevents runaway loop token burn and avoids over-editing finished code.
+  - ~35ms locally on MPS/GPU.
+  - Prevents runaway token burn and eliminates premature victory.
 
 ---
 

@@ -140,6 +140,20 @@ def main():
     gov_pass = (not gov_res["allow_action"]) and gov_res["is_stalled"]
     print_status("8. Trajectory Budget Governor", gov_pass, f"status: {gov_res['governor_status']} ({gov_res['reason'][:60]})")
 
+    # 9. Stop / Done Task Completion Validator
+    from lib.done_validator import validate_task_completion
+    done_res = validate_task_completion(
+        task_goal="Fix database connection timeout error",
+        git_diff="diff --git a/db.py b/db.py\n- timeout = 5\n+ timeout = 30",
+        test_output="12 passed in 0.3s",
+        final_output="Increased pool timeout to 30 seconds. Tests passing.",
+    )
+    print_status(
+        "9. Task Completion Validator",
+        done_res["is_complete"],
+        f"status: {done_res['status']} ({done_res['reason']})",
+    )
+
     print(f"\n{BOLD}=== Simulation Complete ==={RESET}\n")
 
 
