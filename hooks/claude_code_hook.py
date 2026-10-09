@@ -25,6 +25,7 @@ from lib.secret_scan import (
     SECRET_REASON,
     DESTRUCTIVE_CMD_REASON,
 )
+from lib.param_validator import validate_tool_call
 
 # Skill-router labels -> the MCP tools that implement them in Claude Code
 SKILL_TO_TOOLS = {
@@ -61,6 +62,13 @@ def ask(reason: str) -> dict:
 def pre_tool_use(data: dict) -> dict:
     tool_name = data.get("tool_name", "")
     tool_input = data.get("tool_input", {})
+
+    # For Bash or command executions, check for hallucinated CLI flags
+    if tool_name in ("Bash", "run_command"):
+        param_res = validate_tool_call(tool_name, tool_input)
+        if not param_res.get("is_valid", True):
+            msg = f"AgentReflex: {param_res.get('reason')} ({param_res.get('suggestion')})"
+            return ask(msg)
 
     if tool_name == "Bash":
         content = tool_input.get("command", "")

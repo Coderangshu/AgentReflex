@@ -124,8 +124,8 @@ claude mcp add -s user agentreflex -- /path/to/AgentReflex/.venv/bin/python /pat
 The `CLAUDE.md` rules (what makes Claude call the tools proactively) are in this repo's `CLAUDE.md`. Append them to your project's or `~/.claude/CLAUDE.md`.
 
 
-### Exposed MCP Tools (11 Core Modules)
-Once registered, Claude Code has instant access to 11 System 1 tools:
+### Exposed MCP Tools (12 Core Modules)
+Once registered, Claude Code has instant access to 12 System 1 tools:
 - **`reflex_check_violations`**: Pre-action guardrail checking code edits and shell commands for secrets, destructive `rm -rf`, and database drops before running them.
 - **`reflex_grep`**: Surgical context retrieval (`jevgrep`). Chunks target files into 20–30 line windows, scores them locally via Laya in ~30ms, and returns only strictly relevant snippets.
 - **`reflex_review_gate`**: 7-point PR / diff risk audit across API breaks, injections, leaks, perf regressions, test gaps, unhandled errors, and contract violations.
@@ -137,6 +137,7 @@ Once registered, Claude Code has instant access to 11 System 1 tools:
 - **`reflex_trajectory_governor`**: Trajectory velocity and tool budget governor (Warden Governor). Halts unproductive exploration spirals and enforces budget limits.
 - **`reflex_validate_done`**: Automated Stop/Done completion validator. Verifies diffs and test suites satisfy user objectives before concluding.
 - **`reflex_triage_task`**: Speculative multi-question triage fan-out. Classifies task type, risks, migration/auth requirements, and returns enriched execution plan tags.
+- **`reflex_validate_tool_call`**: Hallucinated parameter and tool call gate. Validates command flags, tool arguments, and path plausibility before execution.
 
 </details>
 
@@ -204,6 +205,7 @@ Each tool offloads specialized binary (`true`/`false`) or discrete classificatio
 | **Trajectory & Tool Budget Governor**<br>([`lib/warden_governor.py`](file:///Users/angshuman/git/AgentReflex/lib/warden_governor.py)) | **Multi-factor threshold (`allow_action = false`)**: Intercepts if tool calls >= 25, tokens >= 120,000, identical action loops >= 3, or neural velocity choice `spinning_wheels`/`deviating` (conf >= 0.65) while budget > 60%. | Boolean allow/deny + budget metrics | **Eliminates runaway exploration spirals**, saving tens of thousands of wasted tokens and runaway LLM billing. |
 | **Task Completion Validator**<br>([`lib/done_validator.py`](file:///Users/angshuman/git/AgentReflex/lib/done_validator.py)) | **Composite threshold (`is_complete = true`)**: Verifies code diff and test output fulfill user goal. Flags **`false`** if failing tests score >= 0.60, satisfaction < 0.40, or choice `needs_more_work`. | Boolean complete + missing gaps | **Prevents premature victory** and eliminates speculative over-iteration after tasks are finished. |
 | **Speculative Decision Fan-Out**<br>([`lib/speculative_triage.py`](file:///Users/angshuman/git/AgentReflex/lib/speculative_triage.py)) | **Parallel multi-question triage**: Classifies 6 dimensions simultaneously in 1 forward pass (task type, db migration, test needs, auth sensitivity, breaking change, risk level). Injects typed tags into prompt context. | Typed tags + dimension scores | **Enriches prompts in <45ms**, bypassing multiple sequential remote LLM roundtrips and planning turns. |
+| **Hallucinated Param Gate**<br>([`lib/param_validator.py`](file:///Users/angshuman/git/AgentReflex/lib/param_validator.py)) | **Deterministic + neural validation**: Catches hallucinated CLI flags (`git`, `npm`, `pip`, `pytest`), missing required schema parameters, and nonexistent disk paths before execution. | Validation boolean + suggestions | **Saves 1 full recovery roundtrip** (~2–4s + 1,000+ tokens) per hallucinated tool invocation. |
 | **DOM Element Selector**<br>([`lib/browser_nav.py`](file:///Users/angshuman/git/AgentReflex/lib/browser_nav.py)) | **Multi-candidate choice**: Scores all candidate interactive DOM elements against navigation goal. Returns candidate with highest confidence; returns `None` if `none` wins. | Selected DOM node + confidence | Eliminates sending massive 10,000+ token raw HTML dumps to LLM; picks targets locally in ~40ms. |
 
 ---

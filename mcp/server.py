@@ -32,6 +32,7 @@ from lib.trajectory_pruner import prune_trajectory
 from lib.warden_governor import evaluate_trajectory_governor
 from lib.done_validator import validate_task_completion
 from lib.speculative_triage import triage_task
+from lib.param_validator import validate_tool_call
 from lib.client import is_daemon_alive
 
 logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
@@ -272,6 +273,28 @@ TOOLS = [
             "required": ["content"],
         },
     },
+    {
+        "name": "reflex_validate_tool_call",
+        "description": "Hallucinated tool call and parameter gate. Validates proposed tool name, arguments, CLI flags (git, npm, pip, pytest), and file target paths before execution to prevent execution errors and wasted recovery turns.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tool_name": {
+                    "type": "string",
+                    "description": "Proposed tool name to call",
+                },
+                "args": {
+                    "type": "object",
+                    "description": "Arguments dictionary for the tool call",
+                },
+                "cwd": {
+                    "type": "string",
+                    "description": "Optional working directory context",
+                },
+            },
+            "required": ["tool_name", "args"],
+        },
+    },
 ]
 
 
@@ -358,6 +381,13 @@ def handle_call_tool(name: str, arguments: dict) -> dict:
         content = arguments.get("content", "")
         threshold = arguments.get("threshold", 0.65)
         res = triage_task(content, threshold=threshold)
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+
+    elif name in ("reflex_validate_tool_call", "sys1_validate_tool_call"):
+        tool_name = arguments.get("tool_name", "")
+        args = arguments.get("args", {})
+        cwd = arguments.get("cwd")
+        res = validate_tool_call(tool_name, args, cwd=cwd)
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 
     else:

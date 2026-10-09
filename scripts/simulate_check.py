@@ -165,9 +165,27 @@ def main():
         f"{tags_preview}...",
     )
 
+    # 11. Hallucinated Tool Call & Parameter Gate
+    from lib.param_validator import validate_tool_call
+    bad_call = validate_tool_call(
+        "run_command",
+        {"CommandLine": "git checkout -b --remote-track origin/main"},
+    )
+    good_call = validate_tool_call(
+        "run_command",
+        {"CommandLine": "git checkout -b feature/login origin/main"},
+    )
+    param_pass = (not bad_call["is_valid"]) and good_call["is_valid"]
+    print_status(
+        "11. Hallucinated Parameter Gate",
+        param_pass,
+        f"caught '{bad_call['error_type']}': {bad_call['suggestion']}",
+    )
+
     print(f"\n{BOLD}=== Simulation Complete ==={RESET}\n")
 
 
 if __name__ == "__main__":
     main()
+
 

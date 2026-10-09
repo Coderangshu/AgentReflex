@@ -15,6 +15,7 @@ from lib.secret_scan import (
 )
 from lib.loop_detector import check_agent_loop
 from lib.warden_governor import evaluate_trajectory_governor
+from lib.param_validator import validate_tool_call
 
 
 def parse_transcript_history(transcript_path_str: str) -> tuple[list[dict], int, str]:
@@ -106,7 +107,24 @@ def main():
             )
             return
 
-        # 2. Extract modified code or command across standard parameter names
+        # 2. Hallucinated Tool Call & Parameter Gate
+        cwd_dir = args.get("Cwd") or args.get("cwd") or args.get("working_directory")
+        param_res = validate_tool_call(tool_name, args, cwd=cwd_dir)
+        if not param_res.get("is_valid", True):
+            reason = f"AgentReflex Param Gate: {param_res.get('reason')} Suggestion: {param_res.get('suggestion')}"
+            print(
+                json.dumps(
+                    {
+                        "decision": "deny",
+                        "reason": reason,
+                        "allow_tool": False,
+                        "deny_reason": reason,
+                    }
+                )
+            )
+            return
+
+        # 3. Extract modified code or command across standard parameter names
         command = args.get("commandLine") or args.get("CommandLine") or ""
         edit = (
             args.get("content")

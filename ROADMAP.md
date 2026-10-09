@@ -45,9 +45,12 @@ This roadmap tracks planned and partially implemented System 1 (sub-30ms local d
 
 ---
 
-## 3. Hallucinated Tool Call & Parameter Gate `[NEW]`
+## 3. Hallucinated Tool Call & Parameter Gate `[IMPLEMENTED]`
 
-- **Status**: Not Implemented
+- **Status**: Implemented & Verified
+  - *Module*: `lib/param_validator.py`
+  - *Hooks*: Integrated into `hooks/pre_tool_enforcer.py` and `hooks/claude_code_hook.py`
+  - *MCP*: Exposed as `reflex_validate_tool_call` in `mcp/server.py`
 - **Target Module**: `lib/param_validator.py`
 - **What Problem It Solves**:
   LLMs frequently hallucinate tool arguments (invalid CLI flags like `git checkout -b --remote-track`, wrong file extensions, missing required parameters). This causes failed tool executions and burns an extra LLM turn (~2–4s + 1,000 tokens) recovering from the mistake.

@@ -15,6 +15,7 @@ from lib.trajectory_pruner import prune_trajectory, classify_trajectory_step, pr
 from lib.warden_governor import score_forward_progress, evaluate_trajectory_governor
 from lib.done_validator import validate_task_completion
 from lib.speculative_triage import triage_task
+from lib.param_validator import validate_tool_call
 
 __all__ = [
     "query_laya",
@@ -39,4 +40,5 @@ __all__ = [
     "evaluate_trajectory_governor",
     "validate_task_completion",
     "triage_task",
+    "validate_tool_call",
 ]
