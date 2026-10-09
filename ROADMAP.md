@@ -152,9 +152,12 @@ This roadmap tracks planned and partially implemented System 1 (sub-30ms local d
 
 ---
 
-## 8. Semantic Action Cache ("Learn to Skip") `[NEW]`
+## 8. Semantic Action Cache ("Learn to Skip") `[IMPLEMENTED]`
 
-- **Status**: Not Implemented
+- **Status**: Implemented & Verified
+  - *Module*: `lib/action_cache.py`
+  - *Hooks*: Integrated into `hooks/pre_invocation.py`
+  - *MCP*: Exposed as `reflex_action_cache` in `mcp/server.py`
 - **Target Module**: `lib/action_cache.py`
 - **What Problem It Solves**:
   Agents frequently repeat identical diagnostic steps across sessions (e.g., inspecting git status, checking lint, fetching database schema, verifying environment variables).
@@ -171,12 +174,12 @@ This roadmap tracks planned and partially implemented System 1 (sub-30ms local d
 ## Roadmap Status Summary
 
 | Phase | Capability | Target Module | Status | Existing Foundation |
-| :---: | :--- | :--- | :---: | :--- |
+| :---: | :--- | :--- | :--- | :--- |
 | **1** | **Dynamic Model Tier Router** | `lib/model_router.py` | `[NEW]` | None (Greenfield) |
 | **2** | **Trajectory & History Pruner** | `lib/trajectory_pruner.py` | `[DONE]` | Complete (`lib/trajectory_pruner.py`, hook, MCP) |
-| **3** | **Hallucinated Tool Call Gate** | `lib/param_validator.py` | `[NEW]` | `lib/rule_enforcer.py` (safety only, not schema) |
-| **4** | **Automated Stop / Done Validator** | `lib/done_validator.py` | `[PARTIAL]` | `lib/loop_detector.py::evaluate_task_output()` |
-| **5** | **Speculative Decision Fan-Out** | `lib/speculative_triage.py` | `[PARTIAL]` | `lib/review_gate.py` (7-point PR diff gate) |
+| **3** | **Hallucinated Tool Call Gate** | `lib/param_validator.py` | `[DONE]` | Complete (`lib/param_validator.py`, hooks, MCP) |
+| **4** | **Automated Stop / Done Validator** | `lib/done_validator.py` | `[DONE]` | Complete (`lib/done_validator.py`, MCP) |
+| **5** | **Speculative Decision Fan-Out** | `lib/speculative_triage.py` | `[DONE]` | Complete (`lib/speculative_triage.py`, hook, MCP) |
 | **6** | **Semantic Project Preferences Linter** | `lib/pref_linter.py` | `[NEW]` | None (Greenfield) |
-| **7** | **Trajectory & Tool Budget Governor** | `lib/warden_governor.py` | `[PARTIAL]` | `lib/loop_detector.py::check_agent_loop()` (repetition) |
-| **8** | **Semantic Action Cache** | `lib/action_cache.py` | `[NEW]` | None (Greenfield) |
+| **7** | **Trajectory & Tool Budget Governor** | `lib/warden_governor.py` | `[DONE]` | Complete (`lib/warden_governor.py`, hook, MCP) |
+| **8** | **Semantic Action Cache** | `lib/action_cache.py` | `[DONE]` | Complete (`lib/action_cache.py`, hook, MCP) |

@@ -182,10 +182,26 @@ def main():
         f"caught '{bad_call['error_type']}': {bad_call['suggestion']}",
     )
 
+    # 12. Semantic Action Cache ("Learn to Skip")
+    from lib.action_cache import cache_action_sequence, lookup_action_cache
+    test_intent = "Run test suite check"
+    cache_action_sequence(
+        test_intent,
+        [{"tool": "run_command", "args": {"CommandLine": "pytest -q"}}],
+    )
+    cache_hit = lookup_action_cache(test_intent)
+    cache_pass = bool(cache_hit and cache_hit.get("cache_hit"))
+    print_status(
+        "12. Semantic Action Cache",
+        cache_pass,
+        f"hit '{cache_hit.get('matched_intent')}' with {cache_hit.get('action_count')} cached action(s)",
+    )
+
     print(f"\n{BOLD}=== Simulation Complete ==={RESET}\n")
 
 
 if __name__ == "__main__":
     main()
+
 
 

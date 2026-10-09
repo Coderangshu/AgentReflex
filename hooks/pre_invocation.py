@@ -9,6 +9,7 @@ from lib.skill_picker import pick_skill
 from lib.compaction import score_message_retention
 from lib.trajectory_pruner import prune_trajectory
 from lib.speculative_triage import triage_task
+from lib.action_cache import lookup_action_cache
 
 AUTO_COMPACT_SIZE_THRESHOLD_BYTES = 50 * 1024  # 50 KB
 
@@ -119,6 +120,21 @@ def main():
                 triage_msg = triage_res["summary_tag"]
                 context_parts.append(triage_msg)
                 inject_steps.append({"ephemeralMessage": triage_msg})
+
+            # 4. Semantic Action Cache ("Learn to Skip")
+            cache_hit = lookup_action_cache(user_prompt)
+            if cache_hit and cache_hit.get("cache_hit"):
+                acts = cache_hit.get("actions", [])
+                acts_summary = ", ".join(
+                    f"{a.get('tool', 'tool')}({list((a.get('args') or {}).values())[:1]})"
+                    for a in acts[:3]
+                )
+                cache_msg = (
+                    f"[AgentReflex Action Cache: HIT (conf {cache_hit.get('confidence', 1.0):.2f}) - "
+                    f"Suggested verified actions: {acts_summary}]"
+                )
+                context_parts.append(cache_msg)
+                inject_steps.append({"ephemeralMessage": cache_msg})
 
         full_context = "\n".join(context_parts)
         response = {

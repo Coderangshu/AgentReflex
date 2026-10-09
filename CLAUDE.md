@@ -28,3 +28,8 @@ This project is connected to the local `AgentReflex` decision engine via MCP (`r
 ## 8. Hallucinated Tool Call & Parameter Validation Gate
 - Before running complex shell commands or file operations with unfamiliar syntax or options, call `reflex_validate_tool_call` with `{"tool_name": "...", "args": {...}}` to catch hallucinated CLI flags and prevent broken turns.
 
+## 9. Semantic Action Cache ("Learn to Skip")
+- For recurring diagnostic checks (e.g., test suite runs, linter passes, schema inspections), call `reflex_action_cache` with `{"action": "lookup", "intent": "..."}` to retrieve verified tool sequences instantly with 0 LLM planning tokens.
+- After completing routine diagnostic workflows successfully, save the sequence via `reflex_action_cache` with `{"action": "save", "intent": "...", "actions": [...]}`.
+
+

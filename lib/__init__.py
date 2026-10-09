@@ -16,6 +16,7 @@ from lib.warden_governor import score_forward_progress, evaluate_trajectory_gove
 from lib.done_validator import validate_task_completion
 from lib.speculative_triage import triage_task
 from lib.param_validator import validate_tool_call
+from lib.action_cache import lookup_action_cache, cache_action_sequence
 
 __all__ = [
     "query_laya",
@@ -41,4 +42,6 @@ __all__ = [
     "validate_task_completion",
     "triage_task",
     "validate_tool_call",
+    "lookup_action_cache",
+    "cache_action_sequence",
 ]

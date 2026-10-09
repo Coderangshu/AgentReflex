@@ -33,6 +33,7 @@ from lib.warden_governor import evaluate_trajectory_governor
 from lib.done_validator import validate_task_completion
 from lib.speculative_triage import triage_task
 from lib.param_validator import validate_tool_call
+from lib.action_cache import lookup_action_cache, cache_action_sequence
 from lib.client import is_daemon_alive
 
 logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
@@ -295,6 +296,30 @@ TOOLS = [
             "required": ["tool_name", "args"],
         },
     },
+    {
+        "name": "reflex_action_cache",
+        "description": "Semantic action cache ('Learn to Skip'). Queries or saves verified successful idempotent diagnostic action sequences for a given prompt intent to avoid redundant LLM reasoning roundtrips.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["lookup", "save"],
+                    "description": "'lookup' to check for cached actions; 'save' to store verified sequence",
+                },
+                "intent": {
+                    "type": "string",
+                    "description": "User intent or diagnostic task description",
+                },
+                "actions": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Tool actions list to cache (when action='save')",
+                },
+            },
+            "required": ["action", "intent"],
+        },
+    },
 ]
 
 
@@ -389,6 +414,17 @@ def handle_call_tool(name: str, arguments: dict) -> dict:
         cwd = arguments.get("cwd")
         res = validate_tool_call(tool_name, args, cwd=cwd)
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+
+    elif name in ("reflex_action_cache", "sys1_action_cache"):
+        action = arguments.get("action", "lookup")
+        intent = arguments.get("intent", "")
+        if action == "save":
+            acts = arguments.get("actions", [])
+            ok = cache_action_sequence(intent, acts)
+            return {"content": [{"type": "text", "text": json.dumps({"saved": ok, "intent": intent, "action_count": len(acts)})}]}
+        else:
+            cached = lookup_action_cache(intent)
+            return {"content": [{"type": "text", "text": json.dumps(cached or {"cache_hit": False, "intent": intent}, indent=2)}]}
 
     else:
         return {
