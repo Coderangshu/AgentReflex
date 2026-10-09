@@ -14,6 +14,7 @@ from lib.surgical_retrieval import surgical_search, chunk_file
 from lib.trajectory_pruner import prune_trajectory, classify_trajectory_step, prune_transcript_file
 from lib.warden_governor import score_forward_progress, evaluate_trajectory_governor
 from lib.done_validator import validate_task_completion
+from lib.speculative_triage import triage_task
 
 __all__ = [
     "query_laya",
@@ -37,4 +38,5 @@ __all__ = [
     "score_forward_progress",
     "evaluate_trajectory_governor",
     "validate_task_completion",
+    "triage_task",
 ]

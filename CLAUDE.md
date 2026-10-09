@@ -21,3 +21,6 @@ This project is connected to the local `AgentReflex` decision engine via MCP (`r
 
 ## 6. Task Completion Validation (Stop / Done Reflex)
 - Before concluding complex tasks or declaring victory, call `reflex_validate_done` with `{"task_goal": "...", "git_diff": "...", "test_output": "..."}` to verify all requirements are met and no broken tests or syntax errors remain.
+
+## 7. Speculative Decision Fan-Out & Prompt Triage
+- For complex ambiguous requests, call `reflex_triage_task` with `{"content": "..."}` to extract all tactical traits (migration, auth, breaking API, test needs, risk level) in a single pass before planning.

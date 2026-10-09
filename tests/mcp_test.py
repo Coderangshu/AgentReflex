@@ -42,7 +42,7 @@ class TestMCPServer(unittest.TestCase):
         res = self.rpc("tools/list")
         tools = res["result"]["tools"]
         tool_names = [t["name"] for t in tools]
-        self.assertEqual(len(tool_names), 10)
+        self.assertEqual(len(tool_names), 11)
         self.assertIn("reflex_check_violations", tool_names)
         self.assertIn("reflex_grep", tool_names)
         self.assertIn("reflex_review_gate", tool_names)
@@ -53,6 +53,7 @@ class TestMCPServer(unittest.TestCase):
         self.assertIn("reflex_prune_trajectory", tool_names)
         self.assertIn("reflex_trajectory_governor", tool_names)
         self.assertIn("reflex_validate_done", tool_names)
+        self.assertIn("reflex_triage_task", tool_names)
 
     def test_call_check_violations(self):
         res = self.rpc(

@@ -31,6 +31,7 @@ from lib.memory_gate import judge_memory_promotion
 from lib.trajectory_pruner import prune_trajectory
 from lib.warden_governor import evaluate_trajectory_governor
 from lib.done_validator import validate_task_completion
+from lib.speculative_triage import triage_task
 from lib.client import is_daemon_alive
 
 logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
@@ -257,6 +258,20 @@ TOOLS = [
             "required": ["task_goal"],
         },
     },
+    {
+        "name": "reflex_triage_task",
+        "description": "Speculative decision fan-out and prompt triage. Classifies a task prompt or code diff across 6 tactical dimensions simultaneously (task type, database migration, test needs, auth sensitivity, breaking change, and risk level) in a single GPU pass (<45ms).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "User prompt or code diff to triage",
+                },
+            },
+            "required": ["content"],
+        },
+    },
 ]
 
 
@@ -337,6 +352,12 @@ def handle_call_tool(name: str, arguments: dict) -> dict:
             git_diff=git_diff,
             test_output=test_output,
         )
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+
+    elif name in ("reflex_triage_task", "sys1_triage_task"):
+        content = arguments.get("content", "")
+        threshold = arguments.get("threshold", 0.65)
+        res = triage_task(content, threshold=threshold)
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 
     else:

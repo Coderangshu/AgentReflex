@@ -154,8 +154,20 @@ def main():
         f"status: {done_res['status']} ({done_res['reason']})",
     )
 
+    # 10. Speculative Decision Fan-Out & Prompt Triage
+    from lib.speculative_triage import triage_task, format_triage_tags
+    triage_res = triage_task("Migrate auth schema table to support OAuth tokens")
+    triage_pass = bool(triage_res.get("task_type") and triage_res.get("tags"))
+    tags_preview = format_triage_tags(triage_res)[:70]
+    print_status(
+        "10. Speculative Decision Fan-Out",
+        triage_pass,
+        f"{tags_preview}...",
+    )
+
     print(f"\n{BOLD}=== Simulation Complete ==={RESET}\n")
 
 
 if __name__ == "__main__":
     main()
+

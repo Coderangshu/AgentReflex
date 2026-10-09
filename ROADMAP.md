@@ -86,25 +86,27 @@ This roadmap tracks planned and partially implemented System 1 (sub-30ms local d
 
 ---
 
-## 5. Speculative Decision Fan-Out `[PARTIALLY IMPLEMENTED]`
+## 5. Speculative Decision Fan-Out `[IMPLEMENTED]`
 
-- **Status**: Partially Implemented
-  - *Current State*: `lib/review_gate.py` uses multi-question fan-out (7 risk dimensions in one forward pass).
-  - *Missing*: General pre-invocation prompt triage (extracting multiple task traits like database, auth, UI, breaking changes in a single pass).
+- **Status**: Implemented & Verified
+  - *Module*: `lib/speculative_triage.py`
+  - *Hooks*: Integrated into `hooks/pre_invocation.py` (parallel prompt tagging)
+  - *MCP*: Exposed as `reflex_triage_task` in `mcp/server.py`
 - **Target Module**: `lib/speculative_triage.py`
 - **What Problem It Solves**:
   Agents often need 5–8 tactical classifications answered before acting (e.g., "Is this a bug or feature?", "Does it need a migration?", "Does it touch auth?", "Is it a breaking change?"). Running separate LLM calls or complex prompts introduces multi-second delays.
 - **System 1 Decision Logic**:
   - **Input**: User prompt or git diff hunk.
-  - **Decision (Parallel Multi-Question Batch)**:
+  - **Decision (Parallel Multi-Question Batch in 1 forward pass)**:
+    - `task_type`: bug_fix / feature / refactor / exploration
     - `needs_migration`: Boolean
     - `needs_tests`: Boolean
     - `touches_auth`: Boolean
     - `is_breaking`: Boolean
     - `risk_level`: Low / Medium / High
-  - **Action**: Evaluates all questions in a single forward pass on GPU and injects typed tags into the prompt.
+  - **Action**: Evaluates all questions in a single GPU pass (<45ms) and injects typed tags into the prompt.
 - **Latency & Impact**:
-  - <45ms total on MPS/CUDA for 8 simultaneous questions.
+  - <45ms total on MPS/CUDA for simultaneous tactical questions.
   - Instant prompt enrichment with 0 remote LLM calls.
 
 ---

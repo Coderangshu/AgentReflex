@@ -8,6 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from lib.skill_picker import pick_skill
 from lib.compaction import score_message_retention
 from lib.trajectory_pruner import prune_trajectory
+from lib.speculative_triage import triage_task
 
 AUTO_COMPACT_SIZE_THRESHOLD_BYTES = 50 * 1024  # 50 KB
 
@@ -111,6 +112,13 @@ def main():
                 route_msg = f"[AgentReflex Context Router]: Recommended skill for this request: /{choice}"
                 context_parts.append(route_msg)
                 inject_steps.append({"ephemeralMessage": route_msg})
+
+            # 3. Speculative Prompt Triage (Fan-Out)
+            triage_res = triage_task(user_prompt)
+            if triage_res.get("tags"):
+                triage_msg = triage_res["summary_tag"]
+                context_parts.append(triage_msg)
+                inject_steps.append({"ephemeralMessage": triage_msg})
 
         full_context = "\n".join(context_parts)
         response = {
