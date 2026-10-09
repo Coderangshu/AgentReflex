@@ -80,10 +80,39 @@ def pre_tool_use(data: dict) -> dict:
     return ask(result["reason"]) if result.get("violates") else {}
 
 
+NON_CODE_EXTS = {
+    ".md", ".markdown", ".txt", ".json", ".yaml", ".yml",
+    ".toml", ".ini", ".cfg", ".csv", ".tsv", ".lock", ".env",
+    ".svg", ".png", ".jpg", ".html", ".css", ".scss",
+}
+
+
+def target_file_path(tool_name: str, tool_input: dict) -> str:
+    """Extract target file path from tool arguments."""
+    return (
+        tool_input.get("file_path")
+        or tool_input.get("path")
+        or tool_input.get("file")
+        or ""
+    )
+
+
 def post_tool_use(data: dict) -> dict:
-    content = edited_content(data.get("tool_name", ""), data.get("tool_input", {}))
-    if not content:
+    tool_name = data.get("tool_name", "")
+    tool_input = data.get("tool_input", {})
+    file_path = target_file_path(tool_name, tool_input)
+
+    # Skip documentation, configs, and non-source files to avoid nagging
+    if file_path:
+        suffix = Path(file_path).suffix.lower()
+        if suffix in NON_CODE_EXTS:
+            return {}
+
+    content = edited_content(tool_name, tool_input)
+    # Only nudge for substantive edits to prevent noise on small 2-line tweaks
+    if not content or len(content) < MIN_EDIT_CHARS_FOR_MODEL:
         return {}
+
     res = judge_test_coverage(content)
     if not res.get("requires_verification"):
         return {}

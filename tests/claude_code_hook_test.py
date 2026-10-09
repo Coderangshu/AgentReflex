@@ -55,6 +55,18 @@ class TestClaudeCodeHook(unittest.TestCase):
         out = run_hook(pre("Edit", {"new_string": "def greet(name):\n    return f'Hello {name}'\n"}))
         self.assertEqual(out, "")
 
+    def test_post_tool_use_ignores_docs_and_configs(self):
+        # Markdown edits should never nag about tests
+        out = run_hook({
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "README.md",
+                "content": "# Documentation\n" + "Some documentation text here\n" * 20,
+            },
+        })
+        self.assertEqual(out, "")
+
     def test_prompt_router_recommends_review_tool(self):
         out = run_hook({
             "hook_event_name": "UserPromptSubmit",
