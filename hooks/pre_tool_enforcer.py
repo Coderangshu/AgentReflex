@@ -6,13 +6,23 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from lib.rule_enforcer import check_violations
-from lib.secret_scan import has_hardcoded_secret, MIN_EDIT_CHARS_FOR_MODEL, SECRET_REASON
+from lib.secret_scan import (
+    has_hardcoded_secret,
+    has_destructive_command,
+    MIN_EDIT_CHARS_FOR_MODEL,
+    SECRET_REASON,
+    DESTRUCTIVE_CMD_REASON,
+)
 from lib.loop_detector import check_agent_loop
 from lib.warden_governor import evaluate_trajectory_governor
 
 
 def parse_transcript_history(transcript_path_str: str) -> tuple[list[dict], int, str]:
-    """Read transcript steps to extract action history, tool call counts, and user goal."""
+    """Read transcript steps to extract action history, tool call counts, and user goal.
+
+    Counts tool calls scoped to the CURRENT turn (since the most recent USER_INPUT)
+    to prevent lifetime session tool calls from tripping turn limits.
+    """
     if not transcript_path_str:
         return [], 0, ""
     tpath = Path(transcript_path_str)
@@ -22,22 +32,28 @@ def parse_transcript_history(transcript_path_str: str) -> tuple[list[dict], int,
     try:
         lines = tpath.read_text(encoding="utf-8", errors="replace").splitlines()
         recent_actions = []
-        total_tool_calls = 0
-        user_goal = ""
+        turn_tool_calls = 0
+        current_turn_goal = ""
 
+        # Scan transcript and reset counter on each new user input turn
         for line in lines:
             if not line.strip():
                 continue
             try:
                 item = json.loads(line)
-                # Find the user's initial prompt/request
-                if not user_goal and item.get("type") in ("USER_INPUT", "user"):
-                    user_goal = str(item.get("content", ""))[:300]
+                item_type = item.get("type", "")
+
+                # Reset turn counter and update active goal whenever user inputs new prompt
+                if item_type in ("USER_INPUT", "user"):
+                    turn_tool_calls = 0
+                    current_turn_goal = str(item.get("content", ""))[:300]
+                    continue
 
                 tcs = item.get("tool_calls", [])
                 if tcs:
-                    total_tool_calls += len(tcs)
+                    turn_tool_calls += len(tcs)
                     for tc in tcs:
+                        # Only record actions that were not blocked/denied by guardrails
                         recent_actions.append({
                             "tool": tc.get("name"),
                             "args": tc.get("args", {}),
@@ -46,7 +62,7 @@ def parse_transcript_history(transcript_path_str: str) -> tuple[list[dict], int,
             except Exception:
                 continue
 
-        return recent_actions[-6:], total_tool_calls, user_goal
+        return recent_actions[-6:], turn_tool_calls, current_turn_goal
     except Exception:
         return [], 0, ""
 
@@ -65,18 +81,19 @@ def main():
 
         # 1. Trajectory & Tool Budget Governor Check
         transcript_path = data.get("transcriptPath")
-        recent_actions, total_tool_calls, user_goal = parse_transcript_history(transcript_path)
+        recent_actions, turn_tool_calls, user_goal = parse_transcript_history(transcript_path)
         
         gov_res = evaluate_trajectory_governor(
             task_goal=user_goal,
             recent_actions=recent_actions,
             proposed_tool=tool_name,
             proposed_args=args,
-            total_tool_calls=total_tool_calls,
+            total_tool_calls=turn_tool_calls,
         )
 
         if not gov_res.get("allow_action", True):
             reason = gov_res.get("reason", "Trajectory budget governor intervention")
+            # Only emit valid protobuf fields expected by protojson unmarshaler
             print(
                 json.dumps(
                     {
@@ -84,7 +101,6 @@ def main():
                         "reason": reason,
                         "allow_tool": False,
                         "deny_reason": reason,
-                        "governor_status": gov_res.get("governor_status"),
                     }
                 )
             )
@@ -105,7 +121,20 @@ def main():
             print(json.dumps({"decision": "allow", "allow_tool": True}))
             return
 
-        if not command:
+        if command:
+            if has_destructive_command(command):
+                print(
+                    json.dumps(
+                        {
+                            "decision": "deny",
+                            "reason": DESTRUCTIVE_CMD_REASON,
+                            "allow_tool": False,
+                            "deny_reason": DESTRUCTIVE_CMD_REASON,
+                        }
+                    )
+                )
+                return
+        else:
             # File edit: deterministic secret check, and skip the model on short snippets it over-scores
             if has_hardcoded_secret(edit):
                 print(

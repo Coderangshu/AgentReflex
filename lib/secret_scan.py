@@ -18,8 +18,21 @@ SECRET_RE = re.compile(
     r"|(?i:(?:secret|api[_-]?key|access[_-]?key)\w*)\s*=\s*[A-Za-z0-9/+_-]{16,}"
 )
 
+DESTRUCTIVE_CMD_RE = re.compile(
+    r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*f\s+/(?:\s|$|--)"
+    r"|\brm\s+-[a-zA-Z]*f[a-zA-Z]*r\s+/(?:\s|$|--)"
+    r"|(?i:\bdrop\s+(?:database|schema|table)\b)"
+    r"|(?i:\btruncate\s+(?:table\b)?)"
+    r"|:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"
+)
+
 SECRET_REASON = "AgentReflex: edit appears to contain a hardcoded secret or credential."
+DESTRUCTIVE_CMD_REASON = "AgentReflex: command appears to perform destructive filesystem or database deletion."
 
 
 def has_hardcoded_secret(content: str) -> bool:
     return bool(SECRET_RE.search(content))
+
+
+def has_destructive_command(command: str) -> bool:
+    return bool(DESTRUCTIVE_CMD_RE.search(command))

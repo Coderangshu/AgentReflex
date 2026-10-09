@@ -18,7 +18,13 @@ from lib.client import is_daemon_alive
 from lib.rule_enforcer import check_violations
 from lib.judge import judge_test_coverage
 from lib.skill_picker import pick_skill
-from lib.secret_scan import has_hardcoded_secret, MIN_EDIT_CHARS_FOR_MODEL, SECRET_REASON
+from lib.secret_scan import (
+    has_hardcoded_secret,
+    has_destructive_command,
+    MIN_EDIT_CHARS_FOR_MODEL,
+    SECRET_REASON,
+    DESTRUCTIVE_CMD_REASON,
+)
 
 # Skill-router labels -> the MCP tools that implement them in Claude Code
 SKILL_TO_TOOLS = {
@@ -58,6 +64,8 @@ def pre_tool_use(data: dict) -> dict:
 
     if tool_name == "Bash":
         content = tool_input.get("command", "")
+        if has_destructive_command(content):
+            return ask(DESTRUCTIVE_CMD_REASON)
     else:
         content = edited_content(tool_name, tool_input)
         if has_hardcoded_secret(content):

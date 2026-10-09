@@ -11,9 +11,9 @@ from lib.client import query_laya
 from lib.loop_detector import check_agent_loop
 
 
-# Baseline default budget thresholds for typical agent tasks
-DEFAULT_MAX_TOOL_CALLS = 25
-DEFAULT_MAX_ESTIMATED_TOKENS = 120_000
+# Baseline default budget thresholds per user turn
+DEFAULT_MAX_TOOL_CALLS = 60
+DEFAULT_MAX_ESTIMATED_TOKENS = 250_000
 
 
 def score_forward_progress(
@@ -144,7 +144,7 @@ def evaluate_trajectory_governor(
         }
 
     # 2. Hard budget overrun checks
-    if total_calls >= max_tool_calls:
+    if max_tool_calls > 0 and total_calls >= max_tool_calls:
         return {
             "allow_action": False,
             "governor_status": "TOOL_BUDGET_EXCEEDED",
@@ -152,10 +152,10 @@ def evaluate_trajectory_governor(
             "budget_risk": 1.0,
             "tool_budget_pct": round(tool_budget_pct, 2),
             "token_budget_pct": round(token_budget_pct, 2),
-            "reason": f"Tool budget exhausted ({total_calls}/{max_tool_calls} tool calls). Request user checkpoint.",
+            "reason": f"Tool budget exhausted ({total_calls}/{max_tool_calls} tool calls in current turn). Request user checkpoint.",
         }
 
-    if estimated_tokens >= max_tokens:
+    if max_tokens > 0 and estimated_tokens >= max_tokens:
         return {
             "allow_action": False,
             "governor_status": "TOKEN_BUDGET_EXCEEDED",
@@ -163,7 +163,7 @@ def evaluate_trajectory_governor(
             "budget_risk": 1.0,
             "tool_budget_pct": round(tool_budget_pct, 2),
             "token_budget_pct": round(token_budget_pct, 2),
-            "reason": f"Estimated token budget exhausted ({estimated_tokens:,}/{max_tokens:,} tokens). Request user checkpoint.",
+            "reason": f"Estimated token budget exhausted ({estimated_tokens:,}/{max_tokens:,} tokens in current turn). Request user checkpoint.",
         }
 
     # 3. Neural forward progress velocity scoring (only if sufficient actions taken)
