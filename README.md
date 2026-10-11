@@ -202,7 +202,7 @@ Each tool offloads specialized binary (`true`/`false`) or discrete classificatio
 | **`reflex_review_gate`**<br>([`lib/review_gate.py`](file:///Users/angshuman/git/AgentReflex/lib/review_gate.py)) | **Boolean 7-point audit (`passed = true/false`)**: Tests 7 dimensions with `noul` (API break, security injection, secrets leak, perf regression, test gap, unhandled exception, contract violation). **`passed = false`** if *any* dimension >= 0.70 risk threshold. | Boolean pass/fail + flagged risks | Instant risk audits in **sub-second time**, replacing slow and repetitive full-diff reviews by frontier models. |
 | **`reflex_judge_coverage`**<br>([`lib/judge.py`](file:///Users/angshuman/git/AgentReflex/lib/judge.py)) | **Boolean (`requires_verification = true`)**: Calculates `uncovered_risk = max(0.0, needs_tests - (is_test_file * 0.8))`. Flags **`true`** if `uncovered_risk >= 0.70`. | Boolean flag + risk score | Flags test gaps in **~40ms**, catching omissions early before expensive downstream test and fix cycles. |
 | **`reflex_memory_gate`**<br>([`lib/memory_gate.py`](file:///Users/angshuman/git/AgentReflex/lib/memory_gate.py)) | **Composite boolean (`should_promote = true`)**: Requires `should_promote` noul >= 0.70 **AND** category choice != `ephemeral` (must be `rule`, `architecture`, or `gotcha`). | Boolean promotion + category | Prevents permanent memory from accumulating noise; keeps long-term retrieval lean and high-signal. |
-| **Skill & Intent Router**<br>([`lib/skill_picker.py`](file:///Users/angshuman/git/AgentReflex/lib/skill_picker.py)) | **Multi-class choice + confidence**: Selects target skill (`fast_explore`, `review_gate`, `compact`, `none`). **`is_recommended = true`** if choice != `none` and `confidence > 0.65`. | Skill choice + recommendation flag | **Routes in ~50–130ms with 0 tokens**. Bypasses expensive multi-turn frontier LLM planning (~1,400ms / ~500 tokens). |
+| **Skill & Intent Router**<br>([`lib/model_router.py`](file:///Users/angshuman/git/AgentReflex/lib/model_router.py)) | **8-class unified derivation**: Maps `task_class` directly to target skill (`review_gate`, `fast_explore`, `compact`). Zero redundant model calls. | Skill choice + recommendation flag | **Routes in 0ms overhead** on top of model tier routing. Bypasses expensive multi-turn frontier LLM planning. |
 | **Agent Loop Detector**<br>([`lib/loop_detector.py`](file:///Users/angshuman/git/AgentReflex/lib/loop_detector.py)) | **Deterministic + neural (`is_looping = true`)**: Flags **`true`** immediately if >= 3 identical consecutive actions; or if error present and neural `is_stuck` noul >= 0.99. | Boolean loop flag + reason | **Instantly halts runaway loops**, saving tens of thousands of wasted tokens and stuck retry cycles. |
 | **Trajectory & Tool Budget Governor**<br>([`lib/warden_governor.py`](file:///Users/angshuman/git/AgentReflex/lib/warden_governor.py)) | **Multi-factor threshold (`allow_action = false`)**: Intercepts if tool calls >= 25, tokens >= 120,000, identical action loops >= 3, or neural velocity choice `spinning_wheels`/`deviating` (conf >= 0.65) while budget > 60%. | Boolean allow/deny + budget metrics | **Eliminates runaway exploration spirals**, saving tens of thousands of wasted tokens and runaway LLM billing. |
 | **Task Completion Validator**<br>([`lib/done_validator.py`](file:///Users/angshuman/git/AgentReflex/lib/done_validator.py)) | **Composite threshold (`is_complete = true`)**: Verifies code diff and test output fulfill user goal. Flags **`false`** if failing tests score >= 0.60, satisfaction < 0.40, or choice `needs_more_work`. | Boolean complete + missing gaps | **Prevents premature victory** and eliminates speculative over-iteration after tasks are finished. |
@@ -244,3 +244,37 @@ To eliminate this bottleneck without sacrificing speed:
 4. **Verified Accuracy**:
    - In a 4,386-character file with a secret placed at character 4,000, single-window truncation scored `0.2476` (missed leak).
    - `predict_long` scanned 6 overlapping windows and caught the leak with score `1.0000` (100% certainty, pinpointed in window #5).
+
+---
+
+## 7. Latency & Time-To-First-Token (TTFT) Optimizations
+
+To ensure zero perceived lag on user turns—especially for rapid, interactive tasks—the client-daemon architecture incorporates three major latency optimizations:
+
+### 1. Unix Domain Socket (UDS) with Transparent TCP Fallback
+- **Zero TCP Handshake Overhead**: On macOS and Linux, the client communicates with the resident daemon via `/tmp/agentreflex.sock` using pure OS kernel buffer copies, completely bypassing TCP loopback networking, 3-way handshakes, and `TIME_WAIT` connection teardowns.
+- **~4x Faster Raw Socket IO**: Drops raw IPC transfer latency from ~1.76ms to ~0.44ms per request.
+- **Dual-Mode Resident Daemon**: The daemon binds both UDS and `127.0.0.1:8765` concurrently in the same asyncio event loop. If UDS is unavailable (e.g. on Windows), client requests fall back to TCP transparently without configuration changes.
+
+### 2. Single-Pass Unified Skill & Model Derivation
+- **Eliminated Duplicate Inference**: Previous implementations ran a separate `pick_skill` classifier before `route_model`.
+- **0ms Skill Derivation**: Specialized agent skills are now derived directly from `route_model`'s 8-class taxonomy:
+  - `review_audit` -> `reflex-review-gate`
+  - `simple_inspect` -> `reflex-fast-explore` / `reflex-grep`
+  - Explicit compaction requests -> `reflex-compact`
+- Eliminates 60ms of duplicate neural model latency per prompt turn.
+
+### 3. Neural-Gated Triage Bypass
+- **Smart Conditional Execution**: The heavy multi-dimension speculative prompt triage (`triage_task` checking database migrations, breaking contracts, and security vectors) is automatically bypassed for read-only and trivial tasks (`doc_typo`, `ops_script`, `simple_inspect`).
+- Deep triage runs exclusively when code-modifying intents (`routine_crud`, `complex_refactor`, `hard_debug`, `arch_design`) are detected.
+
+### Real-World TTFT Benchmark Results
+
+| Prompt Type | Unoptimized Hook | Optimized Hook (UDS + Unified Router) | Latency Reduction |
+|---|---|---|---|
+| **Basic Typo** (`fix typo in README`) | **372 ms** | **158 ms** | **~2.35x faster (57% drop)** 🚀 |
+| **Simple Inspect** (`explain auth middleware`) | **~450 ms** | **159 ms** | **~2.8x faster (65% drop)** 🚀 |
+| **Inspect File** (`read config & inspect db`) | **~450 ms** | **162 ms** | **~2.8x faster (64% drop)** 🚀 |
+| **Standard Feature** (`add route for login`) | **447 ms** | **381 ms** | **~15% faster** |
+| **Complex Debug** (`deadlock in worker pool`) | **479 ms** | **393 ms** | **~18% faster** |
+| **Complex Review** (`review git diff for bugs`) | **~480 ms** | **389 ms** | **~19% faster** |

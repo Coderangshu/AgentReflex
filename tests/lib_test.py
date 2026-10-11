@@ -2,7 +2,6 @@ import unittest
 from unittest.mock import patch
 from lib.compaction import score_message_retention, should_prune
 from lib.judge import judge_test_coverage
-from lib.skill_picker import pick_skill
 from lib.file_ranker import rank_files
 from lib.review_gate import review_diff
 from lib.browser_nav import select_element
@@ -30,15 +29,6 @@ class TestSys1HelperLib(unittest.TestCase):
         res = judge_test_coverage("def critical_payment_charge(): pass")
         self.assertTrue(res["requires_verification"])
         self.assertGreaterEqual(res["uncovered_risk"], 0.7)
-
-    @patch("lib.skill_picker.query_laya")
-    def test_skill_picker(self, mock_query):
-        mock_query.return_value = {
-            "route": {"choice": "fast_explore", "answer_confidence": 0.82}
-        }
-        res = pick_skill("find all payment controller files")
-        self.assertEqual(res["skill"], "fast_explore")
-        self.assertTrue(res["is_recommended"])
 
     @patch("lib.file_ranker.query_laya")
     def test_file_ranker(self, mock_query):
@@ -89,6 +79,24 @@ class TestSys1HelperLib(unittest.TestCase):
         res = check_violations("api_key = 'sk_live_1234567890'")
         self.assertTrue(res["violates"])
         self.assertIn("AgentReflex rule guardrail triggered", res["reason"])
+
+    def test_client_uds_and_tcp_fallback(self):
+        from lib.client import is_daemon_alive, query_laya
+
+        # 1. Active daemon test (UDS if available, TCP fallback)
+        self.assertTrue(is_daemon_alive())
+
+        # 2. Forced TCP fallback when UDS path does not exist
+        with patch("lib.client.DEFAULT_UDS_PATH", "/tmp/nonexistent_test.sock"):
+            self.assertTrue(is_daemon_alive())
+            res = query_laya("ping", {
+                "ping": {
+                    "type": "choice",
+                    "instructions": "test",
+                    "criteria": {"a": "test a", "b": "test b"}
+                }
+            })
+            self.assertIn("ping", res)
 
 
 if __name__ == "__main__":

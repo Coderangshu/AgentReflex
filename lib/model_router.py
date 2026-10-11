@@ -159,6 +159,31 @@ def detect_agent_harness(explicit_harness: Optional[str] = None) -> str:
     return "agy"
 
 
+TASK_SKILL_MAP = {
+    "review_audit": {
+        "skill": "review_gate",
+        "tools": ["reflex_review_gate"],
+    },
+    "simple_inspect": {
+        "skill": "fast_explore",
+        "tools": ["reflex_fast_explore", "reflex_grep"],
+    },
+}
+
+
+def derive_skill(task_class: str, prompt: str) -> tuple[Optional[str], list[str]]:
+    """Derive specialized skill recommendation directly from task_class and prompt."""
+    p_lower = prompt.lower()
+    if any(k in p_lower for k in ("compact", "prune memory", "compress memory", "prune context")):
+        return "compact", ["reflex_compact"]
+    if any(k in p_lower for k in ("find all", "rank files", "explore files", "locate files", "search files")):
+        return "fast_explore", ["reflex_fast_explore", "reflex_grep"]
+    mapping = TASK_SKILL_MAP.get(task_class)
+    if mapping:
+        return mapping["skill"], mapping["tools"]
+    return None, []
+
+
 def route_model(prompt: str, harness: Optional[str] = None) -> dict:
     """Classify prompt into task class and return harness-specific model tier + reasoning effort.
 
@@ -183,6 +208,8 @@ def route_model(prompt: str, harness: Optional[str] = None) -> dict:
             "recommended_model": tier_info["model_name"],
             "model_id": tier_info["model_id"],
             "subagent_model": tier_info["subagent_model"],
+            "recommended_skill": None,
+            "skill_tools": [],
             "summary_tag": (
                 f"[AgentReflex Router ({active_harness.upper()}): class=simple_inspect | "
                 f"tier={tier} ({tier_info['model_name']}) | effort={effort}]"
@@ -201,12 +228,15 @@ def route_model(prompt: str, harness: Optional[str] = None) -> dict:
         res = query_laya(prompt[:1200], questions, timeout=10.0)
         tc_res = res.get("task_class", {})
         task_class = tc_res.get("choice", "routine_crud")
-        conf = round(tc_res.get("answer_confidence", 0.5), 3)
+        probs = tc_res.get("probabilities", {})
+        conf = round(probs.get(task_class, tc_res.get("answer_confidence", 0.5)), 3)
 
         base_policy = ROUTING_POLICIES.get(task_class, DEFAULT_POLICY)
         tier = base_policy["model_tier"]
         tier_info = harness_catalog.get(tier, harness_catalog["standard"])
         effort = effort_scale.get(task_class, "medium")
+
+        rec_skill, skill_tools = derive_skill(task_class, prompt)
 
         summary_tag = (
             f"[AgentReflex Router ({active_harness.upper()}): class={task_class} | "
@@ -223,6 +253,8 @@ def route_model(prompt: str, harness: Optional[str] = None) -> dict:
             "recommended_model": tier_info["model_name"],
             "model_id": tier_info["model_id"],
             "subagent_model": tier_info["subagent_model"],
+            "recommended_skill": rec_skill,
+            "skill_tools": skill_tools,
             "summary_tag": summary_tag,
         }
     except Exception:
@@ -237,6 +269,8 @@ def route_model(prompt: str, harness: Optional[str] = None) -> dict:
             "recommended_model": tier_info["model_name"],
             "model_id": tier_info["model_id"],
             "subagent_model": tier_info["subagent_model"],
+            "recommended_skill": None,
+            "skill_tools": [],
             "summary_tag": (
                 f"[AgentReflex Router ({active_harness.upper()}): class=routine_crud | "
                 f"tier=standard ({tier_info['model_name']}) | effort={effort}]"

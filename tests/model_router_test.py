@@ -56,6 +56,27 @@ class TestModelRouter(unittest.TestCase):
         self.assertEqual(claude_res["reasoning_effort"], "max")
         self.assertIn("Claude", claude_res["recommended_model"])
 
+    def test_derived_skills(self):
+        # 1. Review diff -> review_gate
+        rev_res = route_model("review my git diff for security risks before opening PR")
+        self.assertEqual(rev_res["recommended_skill"], "review_gate")
+        self.assertIn("reflex_review_gate", rev_res["skill_tools"])
+
+        # 2. Inspect codebase -> fast_explore
+        insp_res = route_model("find all payment gateway controller files")
+        self.assertEqual(insp_res["recommended_skill"], "fast_explore")
+        self.assertIn("reflex_fast_explore", insp_res["skill_tools"])
+
+        # 3. Explicit compaction -> compact
+        comp_res = route_model("please compact conversation memory and prune logs")
+        self.assertEqual(comp_res["recommended_skill"], "compact")
+        self.assertIn("reflex_compact", comp_res["skill_tools"])
+
+        # 4. Routine doc typo -> no skill needed
+        typo_res = route_model("Fix typo in README header")
+        self.assertIsNone(typo_res["recommended_skill"])
+        self.assertEqual(typo_res["skill_tools"], [])
+
     def test_harness_detection(self):
         self.assertEqual(detect_agent_harness("agy"), "agy")
         self.assertEqual(detect_agent_harness("gemini"), "agy")

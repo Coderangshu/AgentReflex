@@ -5,7 +5,6 @@ from pathlib import Path
 
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from lib.skill_picker import pick_skill
 from lib.compaction import score_message_retention
 from lib.trajectory_pruner import prune_trajectory
 from lib.speculative_triage import triage_task
@@ -104,25 +103,27 @@ def main():
             context_parts.append(summary_msg)
             inject_steps.append({"ephemeralMessage": summary_msg})
 
-        # 2. Skill routing
+        # 2. Dynamic Model Tier, Effort & Skill Router (Single Unified Pass)
         if user_prompt:
-            result = pick_skill(user_prompt)
-            choice = result.get("skill", "none")
-            conf = result.get("confidence", 0.0)
+            router_res = route_model(user_prompt, harness="agy")
+            task_class = router_res.get("task_class", "routine_crud")
 
-            if choice != "none" and conf > 0.65:
-                route_msg = f"[AgentReflex Context Router]: Recommended skill for this request: /{choice}"
+            # 2a. Recommended Skill (derived directly from task_class with 0 extra calls)
+            rec_skill = router_res.get("recommended_skill")
+            if rec_skill:
+                route_msg = f"[AgentReflex Context Router]: Recommended skill for this request: /{rec_skill}"
                 context_parts.append(route_msg)
                 inject_steps.append({"ephemeralMessage": route_msg})
 
-            # 3. Speculative Prompt Triage (Fan-Out)
-            triage_res = triage_task(user_prompt)
-            if triage_res.get("tags"):
-                triage_msg = triage_res["summary_tag"]
-                context_parts.append(triage_msg)
-                inject_steps.append({"ephemeralMessage": triage_msg})
+            # 2b. Speculative Prompt Triage (Bypassed for simple/inspect tasks to protect TTFT)
+            if task_class not in ("doc_typo", "ops_script", "simple_inspect"):
+                triage_res = triage_task(user_prompt)
+                if triage_res.get("tags"):
+                    triage_msg = triage_res["summary_tag"]
+                    context_parts.append(triage_msg)
+                    inject_steps.append({"ephemeralMessage": triage_msg})
 
-            # 4. Semantic Action Cache ("Learn to Skip")
+            # 2c. Semantic Action Cache ("Learn to Skip")
             cache_hit = lookup_action_cache(user_prompt)
             if cache_hit and cache_hit.get("cache_hit"):
                 acts = cache_hit.get("actions", [])
@@ -137,8 +138,7 @@ def main():
                 context_parts.append(cache_msg)
                 inject_steps.append({"ephemeralMessage": cache_msg})
 
-            # 5. Dynamic Model Tier & Effort Router (AGY Harness: Gemini 3.8 Flash / 3.1 Pro)
-            router_res = route_model(user_prompt, harness="agy")
+            # 2d. Injected Model Tier & Reasoning Tag
             if router_res.get("summary_tag"):
                 router_msg = router_res["summary_tag"]
                 context_parts.append(router_msg)

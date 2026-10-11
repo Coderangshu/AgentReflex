@@ -79,8 +79,10 @@ def score_forward_progress(
     }
 
     res = query_laya(state, questions)
-    velocity_choice = res.get("velocity", {}).get("choice", "advancing")
-    velocity_conf = res.get("velocity", {}).get("answer_confidence", 0.0)
+    vel_data = res.get("velocity", {})
+    velocity_choice = vel_data.get("choice", "advancing")
+    probs = vel_data.get("probabilities", {})
+    velocity_conf = probs.get(velocity_choice, vel_data.get("answer_confidence", vel_data.get("confidence", 0.0)))
     productive_score = res.get("is_productive", {}).get("noul", 0.8)
 
     is_stalled = (

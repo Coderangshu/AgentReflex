@@ -38,8 +38,11 @@ def select_element(goal: str, candidates: list[dict]) -> dict:
     }
 
     res = query_laya(state, questions)
-    choice = res.get("best_element", {}).get("choice", "none")
-    conf = res.get("best_element", {}).get("answer_confidence", 0.0)
+    best_data = res.get("best_element", {})
+    choice = best_data.get("choice", "none")
+    conf = best_data.get("probabilities", {}).get(
+        choice, best_data.get("answer_confidence", best_data.get("confidence", 0.0))
+    )
 
     winner = candidate_map.get(choice) if choice != "none" else None
     return {

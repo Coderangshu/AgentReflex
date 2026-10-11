@@ -17,7 +17,6 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from lib.client import is_daemon_alive
 from lib.rule_enforcer import check_violations
 from lib.judge import judge_test_coverage
-from lib.skill_picker import pick_skill
 from lib.secret_scan import (
     has_hardcoded_secret,
     has_destructive_command,
@@ -143,13 +142,13 @@ def user_prompt_submit(data: dict) -> dict:
 
     context_lines = []
 
-    res = pick_skill(prompt)
-    tools = SKILL_TO_TOOLS.get(res.get("skill", "none"))
-    if tools and res.get("is_recommended"):
+    # Dynamic Model & Effort routing for Claude Code (includes derived skill)
+    route = route_model(prompt, harness="claude")
+    rec_skill = route.get("recommended_skill")
+    tools = SKILL_TO_TOOLS.get(rec_skill)
+    if tools:
         context_lines.append(f"[AgentReflex Router] This request fits the AgentReflex tool(s): {tools}.")
 
-    # Dynamic Model & Effort routing for Claude Code
-    route = route_model(prompt, harness="claude")
     if route.get("model_tier"):
         context_lines.append(
             f"[AgentReflex Model Tier: {route['model_tier'].upper()} ({route['recommended_model']}) | "

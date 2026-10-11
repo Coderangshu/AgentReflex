@@ -16,10 +16,12 @@ stop:
 		echo "Stopping Laya daemon (PID $$PID)..."; \
 		kill $$PID 2>/dev/null || true; \
 		rm -f $(PID_FILE); \
+		rm -f /tmp/agentreflex.sock; \
 		echo "Daemon stopped."; \
 	else \
 		echo "PID file not found. Trying pkill..."; \
 		pkill -f "daemon/server.py" || echo "No running daemon found."; \
+		rm -f /tmp/agentreflex.sock; \
 	fi
 
 status:
@@ -35,4 +37,4 @@ simulate:
 	@$(PYTHON) ./scripts/simulate_check.py
 
 clean:
-	rm -f $(PID_FILE) daemon.log
+	rm -f $(PID_FILE) daemon.log /tmp/agentreflex.sock

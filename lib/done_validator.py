@@ -74,8 +74,11 @@ def validate_task_completion(
 
     res = query_laya(state, questions)
 
-    status_choice = res.get("status", {}).get("choice", "task_complete")
-    status_conf = res.get("status", {}).get("answer_confidence", 0.0)
+    status_data = res.get("status", {})
+    status_choice = status_data.get("choice", "task_complete")
+    status_conf = status_data.get("probabilities", {}).get(
+        status_choice, status_data.get("answer_confidence", status_data.get("confidence", 0.0))
+    )
     has_failures = res.get("has_failing_tests", {}).get("noul", 0.0)
     satisfies_goal = res.get("satisfies_goal", {}).get("noul", 0.8)
 

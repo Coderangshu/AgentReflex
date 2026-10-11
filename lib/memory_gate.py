@@ -38,8 +38,11 @@ def judge_memory_promotion(lesson_text: str, context: str = "") -> dict:
     res = query_laya(state, questions)
 
     promote_score = res.get("should_promote", {}).get("noul", 0.0)
-    category = res.get("category", {}).get("choice", "ephemeral")
-    cat_conf = res.get("category", {}).get("answer_confidence", 0.0)
+    cat_data = res.get("category", {})
+    category = cat_data.get("choice", "ephemeral")
+    cat_conf = cat_data.get("probabilities", {}).get(
+        category, cat_data.get("answer_confidence", cat_data.get("confidence", 0.0))
+    )
 
     # Must have high promote score and not classified as ephemeral
     should_promote = (promote_score >= 0.70) and (category != "ephemeral")
