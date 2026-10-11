@@ -134,7 +134,7 @@ def main():
                 current_model = sa.get("Model", "inherit")
                 # If model is unspecified or set to default/inherit/pro, dynamically route
                 if current_model in ("inherit", "pro", ""):
-                    route_decision = route_model(sa_prompt)
+                    route_decision = route_model(sa_prompt, harness="agy")
                     target_model = route_decision.get("subagent_model", "flash")
                     if target_model != current_model:
                         sa["Model"] = target_model

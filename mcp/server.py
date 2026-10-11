@@ -331,6 +331,11 @@ TOOLS = [
                     "type": "string",
                     "description": "User task prompt to classify and route",
                 },
+                "harness": {
+                    "type": "string",
+                    "enum": ["agy", "claude"],
+                    "description": "Optional agent harness: 'agy' (Gemini 3.8 Flash / 3.1 Pro) or 'claude' (Haiku / Sonnet / Opus)",
+                },
             },
             "required": ["prompt"],
         },
@@ -443,7 +448,8 @@ def handle_call_tool(name: str, arguments: dict) -> dict:
 
     elif name in ("reflex_route_model", "sys1_route_model"):
         prompt = arguments.get("prompt", "")
-        res = route_model(prompt)
+        harness = arguments.get("harness")
+        res = route_model(prompt, harness=harness)
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 
     else:

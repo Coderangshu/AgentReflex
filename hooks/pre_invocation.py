@@ -137,8 +137,8 @@ def main():
                 context_parts.append(cache_msg)
                 inject_steps.append({"ephemeralMessage": cache_msg})
 
-            # 5. Dynamic Model Tier & Effort Router
-            router_res = route_model(user_prompt)
+            # 5. Dynamic Model Tier & Effort Router (AGY Harness: Gemini 3.8 Flash / 3.1 Pro)
+            router_res = route_model(user_prompt, harness="agy")
             if router_res.get("summary_tag"):
                 router_msg = router_res["summary_tag"]
                 context_parts.append(router_msg)

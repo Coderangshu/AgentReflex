@@ -16,7 +16,7 @@ def is_daemon_alive(timeout: float = 1.0) -> bool:
         return False
 
 
-def query_laya(state: str, questions: dict, timeout: float = 3.0) -> dict:
+def query_laya(state: str, questions: dict, timeout: float = 10.0) -> dict:
     """Send state and questions to the local Laya daemon."""
     try:
         payload = json.dumps({"state": state, "questions": questions}).encode("utf-8")

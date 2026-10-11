@@ -26,6 +26,7 @@ from lib.secret_scan import (
     DESTRUCTIVE_CMD_REASON,
 )
 from lib.param_validator import validate_tool_call
+from lib.model_router import route_model
 
 # Skill-router labels -> the MCP tools that implement them in Claude Code
 SKILL_TO_TOOLS = {
@@ -139,14 +140,29 @@ def user_prompt_submit(data: dict) -> dict:
     prompt = data.get("prompt", "")
     if not prompt:
         return {}
+
+    context_lines = []
+
     res = pick_skill(prompt)
     tools = SKILL_TO_TOOLS.get(res.get("skill", "none"))
-    if not tools or not res.get("is_recommended"):
+    if tools and res.get("is_recommended"):
+        context_lines.append(f"[AgentReflex Router] This request fits the AgentReflex tool(s): {tools}.")
+
+    # Dynamic Model & Effort routing for Claude Code
+    route = route_model(prompt, harness="claude")
+    if route.get("model_tier"):
+        context_lines.append(
+            f"[AgentReflex Model Tier: {route['model_tier'].upper()} ({route['recommended_model']}) | "
+            f"Effort: {route['reasoning_effort'].upper()} | Thinking: {route['max_thinking_tokens']} tokens]"
+        )
+
+    if not context_lines:
         return {}
+
     return {
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
-            "additionalContext": f"[AgentReflex Router] This request fits the AgentReflex tool(s): {tools}.",
+            "additionalContext": "\n".join(context_lines),
         }
     }
 
