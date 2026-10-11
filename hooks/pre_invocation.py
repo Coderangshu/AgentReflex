@@ -6,7 +6,10 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from lib.compaction import score_message_retention
-from lib.trajectory_pruner import prune_trajectory
+from lib.trajectory_pruner import (
+    prune_trajectory,
+    prune_transcript_file_incremental,
+)
 from lib.speculative_triage import triage_task
 from lib.action_cache import lookup_action_cache
 from lib.model_router import route_model
@@ -15,7 +18,7 @@ AUTO_COMPACT_SIZE_THRESHOLD_BYTES = 50 * 1024  # 50 KB
 
 
 def compact_recent_transcript(transcript_path_str: str) -> dict:
-    """Fast non-blocking check for large transcripts to avoid freezing interactive turns."""
+    """Incremental neural trajectory pruning with disk memoization."""
     if not transcript_path_str:
         return {}
 
@@ -28,15 +31,29 @@ def compact_recent_transcript(transcript_path_str: str) -> dict:
         if file_size < AUTO_COMPACT_SIZE_THRESHOLD_BYTES:
             return {}
 
-        # Alert the model to prune context via /reflex-compact rather than blocking interactive turn
+        res = prune_transcript_file_incremental(tpath)
+        pruned_count = res.get("pruned_steps", 0)
+        total_steps = res.get("total_steps", 0)
+
+        if pruned_count == 0:
+            return {}
+
+        active_summary = " ".join([
+            s.get("content", "")[:60].replace("\n", " ")
+            for s in res.get("active_steps", [])[-3:]
+        ])
+
         summary_text = (
-            f"[AgentReflex Trajectory Pruner Alert]: Active transcript is {file_size // 1024}KB. "
-            f"Run /reflex-compact if memory pruning is needed."
+            f"[AgentReflex Trajectory Pruner]: Pruned {pruned_count}/{total_steps} "
+            f"obsolete/noise steps ({res.get('reduction_pct', 0)}% reduction, "
+            f"{file_size // 1024}KB file). Active state: {active_summary}"
         )
         return {
             "active": True,
             "summary": summary_text,
-            "pruned_steps": 0,
+            "pruned_steps": pruned_count,
+            "total_steps": total_steps,
+            "reduction_pct": res.get("reduction_pct", 0),
         }
     except Exception:
         return {}

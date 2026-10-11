@@ -166,3 +166,121 @@ def prune_transcript_file(transcript_path: Path | str) -> Dict[str, Any]:
                 continue
 
     return prune_trajectory(steps)
+
+
+CACHE_DIR = Path.home() / ".cache" / "agentreflex" / "trajectory"
+
+
+def _get_transcript_cache_path(tpath: Path) -> Path:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    import hashlib
+    h = hashlib.md5(str(tpath.resolve()).encode("utf-8")).hexdigest()
+    return CACHE_DIR / f"{h}.json"
+
+
+def prune_transcript_file_incremental(transcript_path: Path | str, max_neural_steps: int = 5) -> Dict[str, Any]:
+    """Incrementally analyze transcript steps with neural memoization.
+
+    1. Loads previously classified step decisions from disk cache (0ms).
+    2. Identifies unclassified steps.
+    3. Runs Laya neural classification ONLY on the newest unclassified steps.
+    4. For older steps in a cold-start file, uses fast heuristic noise detection to prevent freeze.
+    5. Caches all decisions to disk so each step is evaluated by Laya at most ONCE.
+    """
+    tpath = Path(transcript_path)
+    if not tpath.exists():
+        return {"total_steps": 0, "pruned_steps": 0, "active_steps": [], "pruned_indices": []}
+
+    steps = []
+    with open(tpath, "r", encoding="utf-8", errors="replace") as f:
+        for idx, line in enumerate(f):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+                steps.append({
+                    "step_index": data.get("step_index", idx + 1),
+                    "type": data.get("type", "UNKNOWN"),
+                    "tool_name": data.get("tool_name", ""),
+                    "content": data.get("content", ""),
+                })
+            except Exception:
+                continue
+
+    if not steps:
+        return {"total_steps": 0, "pruned_steps": 0, "active_steps": [], "pruned_indices": []}
+
+    cache_file = _get_transcript_cache_path(tpath)
+    cached_decisions: Dict[str, dict] = {}
+    if cache_file.exists():
+        try:
+            cached_decisions = json.loads(cache_file.read_text(encoding="utf-8")).get("steps", {})
+        except Exception:
+            cached_decisions = {}
+
+    total_steps = len(steps)
+    pruned_indices = []
+    active_steps = []
+    updated_cache = dict(cached_decisions)
+
+    unclassified_indices = [
+        i for i, s in enumerate(steps)
+        if str(s.get("step_index", i)) not in cached_decisions and s.get("type") not in ("USER_INPUT", "USER_EXPLICIT")
+    ]
+
+    neural_eval_set = set(unclassified_indices[-max_neural_steps:])
+
+    cache_dirty = False
+
+    for i, step in enumerate(steps):
+        step_idx = step.get("step_index", i)
+        skey = str(step_idx)
+        step_type = step.get("type", "")
+        content = step.get("content", "")
+
+        if step_type in ("USER_INPUT", "USER_EXPLICIT"):
+            active_steps.append(step)
+            continue
+
+        if skey in cached_decisions:
+            cls_res = cached_decisions[skey]
+        elif i in neural_eval_set:
+            future_snippets = []
+            for next_step in steps[i + 1 : i + 4]:
+                tname = next_step.get("tool_name", "")
+                snippet = next_step.get("content", "")[:120].replace("\n", " ")
+                future_snippets.append(f"{tname}: {snippet}".strip())
+            future_context = " -> ".join(future_snippets)
+
+            cls_res = classify_trajectory_step(content, future_context=future_context)
+            updated_cache[skey] = cls_res
+            cache_dirty = True
+        else:
+            h_res = score_message_retention(content)
+            cls_res = {
+                "category": "transient_listing" if h_res.get("should_prune") else "durable_state",
+                "should_prune": h_res.get("should_prune", False),
+            }
+            updated_cache[skey] = cls_res
+            cache_dirty = True
+
+        if cls_res.get("should_prune", False):
+            pruned_indices.append(step_idx)
+        else:
+            active_steps.append(step)
+
+    if cache_dirty:
+        try:
+            cache_file.write_text(json.dumps({"steps": updated_cache}), encoding="utf-8")
+        except Exception:
+            pass
+
+    return {
+        "total_steps": total_steps,
+        "pruned_steps": len(pruned_indices),
+        "kept_steps": len(active_steps),
+        "pruned_indices": pruned_indices,
+        "active_steps": active_steps,
+        "reduction_pct": round((len(pruned_indices) / max(1, total_steps)) * 100, 1),
+    }
