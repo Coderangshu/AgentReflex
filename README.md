@@ -140,6 +140,7 @@ Once registered, Claude Code has instant access to 14 System 1 tools:
 - **`reflex_validate_tool_call`**: Hallucinated parameter and tool call gate. Validates command flags, tool arguments, and path plausibility before execution.
 - **`reflex_action_cache`**: Semantic action cache ("Learn to Skip"). Stores and retrieves verified successful idempotent diagnostic action sequences.
 - **`reflex_route_model`**: Dynamic Model Tier & Effort Router. Classifies task across 8 categories and outputs model tier, reasoning effort, and thinking token limits.
+- **`reflex_intent_drift`**: Cross-turn intent drift alarm. Compares ongoing agent action trace against the primary user objective to detect and arrest off-topic tangents.
 
 </details>
 
@@ -166,6 +167,7 @@ See the complete [Tool Reference](docs/tools.md) for full parameter schemas, inp
 15. **Semantic Action Cache**: Caches verified idempotent diagnostic sequences bound to git commit state for instant replay.
 16. **Dynamic Model Router**: Dynamically selects model tier (`flash`, `standard`, `frontier`), reasoning effort, and thinking budget based on prompt complexity.
 17. **DOM Element Selector**: Evaluates candidate interactive browser DOM elements against user navigation goals, choosing the single optimal element locally in ~40ms and avoiding massive raw HTML token dumps to LLMs.
+18. **Cross-Turn Intent Drift Alarm**: Compares active multi-turn tool action traces against the original user goal using resident neural scoring to halt off-topic drift.
 
 ---
 

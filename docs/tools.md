@@ -167,3 +167,16 @@ Each tool runs locally against the resident Laya daemon in sub-50ms on GPU (MPS/
       - `choice_key`: Selected candidate identifier.
       - `confidence`: Confidence score.
 
+18. Cross-Turn Intent Drift Alarm
+    - **What it does**: Compares the user's primary objective against multi-turn tool action traces to detect semantic drift and prevent the agent from wandering into off-topic tangents.
+    - **Input**:
+      - `primary_goal`: Original user objective prompt.
+      - `recent_actions`: List of recent tool calls and arguments.
+      - `proposed_tool`: Upcoming tool name.
+      - `proposed_args`: Upcoming tool arguments.
+    - **Output**:
+      - `has_drifted`: Boolean (`true` if alignment drops below threshold).
+      - `alignment_score`: Neural relevance score (`0.0` to `1.0`).
+      - `drift_status`: `"aligned"` or `"drifting"`.
+      - `warning`: Remediation warning prompt when drift is detected.
+

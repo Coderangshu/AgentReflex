@@ -16,6 +16,7 @@ from lib.secret_scan import (
 from lib.loop_detector import check_agent_loop
 from lib.warden_governor import evaluate_trajectory_governor
 from lib.param_validator import validate_tool_call
+from lib.intent_drift import check_intent_drift
 try:
     from lib.server_logger import (
         log_activity,
@@ -67,7 +68,11 @@ def parse_transcript_history(transcript_path_str: str) -> tuple[list[dict], int,
                 # Reset turn counter and update active goal whenever user inputs new prompt
                 if item_type in ("USER_INPUT", "user", "USER_PROMPT", "USER") or item.get("source") in ("USER_EXPLICIT", "USER"):
                     turn_tool_calls = 0
-                    current_turn_goal = str(item.get("content", ""))[:300]
+                    raw_c = str(item.get("content", ""))
+                    # Strip XML wrapping like <USER_REQUEST>
+                    for tag in ("<USER_REQUEST>", "</USER_REQUEST>", "<ADDITIONAL_METADATA>", "</ADDITIONAL_METADATA>"):
+                        raw_c = raw_c.replace(tag, "")
+                    current_turn_goal = raw_c.strip()[:300]
                     continue
 
                 tcs = item.get("tool_calls", [])
@@ -145,7 +150,34 @@ def main():
             emit_decision("deny", reason)
             return
 
-        # 2. Hallucinated Tool Call & Parameter Gate
+        # 2. Cross-Turn Intent Drift Alarm (exempt read-only tools and verification commands)
+        READ_ONLY_TOOLS = {
+            "view_file",
+            "find_by_name",
+            "grep_search",
+            "read_url_content",
+            "read_resource",
+            "list_resources",
+            "view_image",
+        }
+        cmd_str = (args.get("CommandLine") or args.get("commandLine") or "").lower()
+        is_dev_verification = any(k in cmd_str for k in ("unittest", "pytest", "git status", "git diff", "git log", "make test", "npm test"))
+
+        # Skip drift check if goal is very short/conversational (<= 25 chars like "ok implement this")
+        is_short_prompt = len(user_goal.strip()) <= 25
+
+        if user_goal and not is_short_prompt and len(recent_actions) >= 3 and tool_name not in READ_ONLY_TOOLS and not is_dev_verification:
+            drift_res = check_intent_drift(
+                primary_goal=user_goal,
+                recent_actions=recent_actions,
+                proposed_tool=tool_name,
+                proposed_args=args,
+            )
+            if drift_res.get("has_drifted", False):
+                emit_decision("deny", drift_res.get("warning"))
+                return
+
+        # 3. Hallucinated Tool Call & Parameter Gate
         param_res = validate_tool_call(tool_name, args, cwd=cwd_dir)
         if not param_res.get("is_valid", True):
             reason = f"AgentReflex Param Gate: {param_res.get('reason')} Suggestion: {param_res.get('suggestion')}"

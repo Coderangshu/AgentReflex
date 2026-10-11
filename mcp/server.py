@@ -35,6 +35,7 @@ from lib.speculative_triage import triage_task
 from lib.param_validator import validate_tool_call
 from lib.action_cache import lookup_action_cache, cache_action_sequence
 from lib.model_router import route_model
+from lib.intent_drift import check_intent_drift
 from lib.client import is_daemon_alive
 
 logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
@@ -340,6 +341,36 @@ TOOLS = [
             "required": ["prompt"],
         },
     },
+    {
+        "name": "reflex_intent_drift",
+        "description": "Cross-Turn Intent Drift Alarm. Compares the agent's current activity trace against the original user goal to catch semantic derailment and off-topic tangents in real time.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "primary_goal": {
+                    "type": "string",
+                    "description": "Original user prompt or primary objective",
+                },
+                "recent_actions": {
+                    "type": "array",
+                    "description": "List of recent tool actions executed in this session",
+                    "items": {"type": "object"},
+                    "default": [],
+                },
+                "proposed_tool": {
+                    "type": "string",
+                    "description": "Optional next proposed tool name",
+                    "default": "",
+                },
+                "proposed_args": {
+                    "type": "object",
+                    "description": "Optional arguments for the next proposed tool",
+                    "default": {},
+                },
+            },
+            "required": ["primary_goal"],
+        },
+    },
 ]
 
 
@@ -450,6 +481,19 @@ def handle_call_tool(name: str, arguments: dict) -> dict:
         prompt = arguments.get("prompt", "")
         harness = arguments.get("harness")
         res = route_model(prompt, harness=harness)
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+
+    elif name in ("reflex_intent_drift", "sys1_intent_drift"):
+        primary_goal = arguments.get("primary_goal", "")
+        recent_actions = arguments.get("recent_actions", [])
+        proposed_tool = arguments.get("proposed_tool", "")
+        proposed_args = arguments.get("proposed_args", {})
+        res = check_intent_drift(
+            primary_goal=primary_goal,
+            recent_actions=recent_actions,
+            proposed_tool=proposed_tool,
+            proposed_args=proposed_args,
+        )
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 
     else:
