@@ -15,7 +15,7 @@ AUTO_COMPACT_SIZE_THRESHOLD_BYTES = 50 * 1024  # 50 KB
 
 
 def compact_recent_transcript(transcript_path_str: str) -> dict:
-    """Read transcript, run semantic trajectory pruning, and return compacted context if bloated."""
+    """Fast non-blocking check for large transcripts to avoid freezing interactive turns."""
     if not transcript_path_str:
         return {}
 
@@ -28,51 +28,17 @@ def compact_recent_transcript(transcript_path_str: str) -> dict:
         if file_size < AUTO_COMPACT_SIZE_THRESHOLD_BYTES:
             return {}
 
-        raw_steps = []
-        with open(tpath, "r", encoding="utf-8", errors="replace") as f:
-            for idx, line in enumerate(f):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                    raw_steps.append({
-                        "step_index": data.get("step_index", idx + 1),
-                        "type": data.get("type", "UNKNOWN"),
-                        "tool_name": data.get("tool_name", ""),
-                        "content": data.get("content", ""),
-                    })
-                except Exception:
-                    continue
-
-        if not raw_steps:
-            return {}
-
-        # Run semantic trajectory pruner (AgentDiet)
-        res = prune_trajectory(raw_steps)
-        pruned_count = res.get("pruned_steps", 0)
-        total_steps = res.get("total_steps", len(raw_steps))
-
-        if pruned_count > 0:
-            kept = res.get("active_steps", [])
-            sample_kept = [
-                f"Step {s.get('step_index')}: {s.get('content', '')[:120].replace(chr(10), ' ').strip()}"
-                for s in kept[-5:]
-                if s.get("content")
-            ]
-            summary_text = (
-                f"[AgentReflex Trajectory Pruner]: Pruned {pruned_count}/{total_steps} obsolete/noise steps "
-                f"({res.get('reduction_pct', 0)}% reduction, {file_size // 1024}KB file). "
-                f"Active state: {' | '.join(sample_kept) if sample_kept else 'Clean context preserved'}."
-            )
-            return {
-                "active": True,
-                "summary": summary_text,
-                "pruned_steps": pruned_count,
-            }
-        return {}
+        # Alert the model to prune context via /reflex-compact rather than blocking interactive turn
+        summary_text = (
+            f"[AgentReflex Trajectory Pruner Alert]: Active transcript is {file_size // 1024}KB. "
+            f"Run /reflex-compact if memory pruning is needed."
+        )
+        return {
+            "active": True,
+            "summary": summary_text,
+            "pruned_steps": 0,
+        }
     except Exception:
-        return {}
         return {}
 
 
