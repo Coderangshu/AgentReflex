@@ -10,19 +10,128 @@ from pathlib import Path
 from lib.client import query_laya
 
 
-def chunk_file(file_path: Path, window_lines: int = 30, overlap: int = 5) -> list[dict]:
-    """Split a file into overlapping line windows with metadata."""
-    if not file_path.exists() or file_path.is_dir():
-        return []
+# Language mapping from extension or shebang
+LANGUAGE_EXTENSIONS = {
+    ".py": "python",
+    ".rs": "rust",
+    ".ts": "typescript",
+    ".tsx": "tsx",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".go": "go",
+    ".c": "c",
+    ".cpp": "cpp",
+    ".cc": "cpp",
+    ".cxx": "cpp",
+    ".h": "c",
+    ".hpp": "cpp",
+    ".java": "java",
+}
+
+# Top-level AST node types representing cohesive functional blocks
+AST_BOUNDARY_NODES = {
+    "python": {
+        "function_definition",
+        "async_function_definition",
+        "class_definition",
+        "decorated_definition",
+    },
+    "rust": {
+        "function_item",
+        "impl_item",
+        "struct_item",
+        "enum_item",
+        "trait_item",
+        "mod_item",
+        "macro_definition",
+    },
+    "typescript": {
+        "function_declaration",
+        "method_definition",
+        "class_declaration",
+        "interface_declaration",
+        "type_alias_declaration",
+        "enum_declaration",
+        "export_statement",
+        "lexical_declaration",
+        "variable_declaration",
+    },
+    "tsx": {
+        "function_declaration",
+        "method_definition",
+        "class_declaration",
+        "interface_declaration",
+        "type_alias_declaration",
+        "enum_declaration",
+        "export_statement",
+        "lexical_declaration",
+        "variable_declaration",
+    },
+    "javascript": {
+        "function_declaration",
+        "method_definition",
+        "class_declaration",
+        "export_statement",
+        "lexical_declaration",
+        "variable_declaration",
+    },
+    "go": {
+        "function_declaration",
+        "method_declaration",
+        "type_declaration",
+    },
+    "c": {
+        "function_definition",
+        "struct_specifier",
+        "enum_specifier",
+        "type_definition",
+    },
+    "cpp": {
+        "function_definition",
+        "class_specifier",
+        "struct_specifier",
+        "namespace_definition",
+        "template_declaration",
+    },
+    "java": {
+        "class_declaration",
+        "interface_declaration",
+        "method_declaration",
+        "constructor_declaration",
+    },
+}
+
+
+def detect_language(file_path: Path) -> str:
+    """Automatically detect programming language from extension or shebang."""
+    ext = file_path.suffix.lower()
+    if ext in LANGUAGE_EXTENSIONS:
+        return LANGUAGE_EXTENSIONS[ext]
 
     try:
-        lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            first_line = f.readline().strip()
+            if first_line.startswith("#!"):
+                lower = first_line.lower()
+                if "python" in lower:
+                    return "python"
+                if "node" in lower or "bun" in lower:
+                    return "javascript"
+                if "bash" in lower or "sh" in lower:
+                    return "bash"
     except Exception:
-        return []
+        pass
 
-    if not lines:
-        return []
+    return "unknown"
 
+
+def _chunk_sliding_window(
+    lines: list[str],
+    file_path: Path,
+    window_lines: int = 30,
+    overlap: int = 5,
+) -> list[dict]:
+    """Fallback sliding window chunking for non-code or unsupported syntax."""
     chunks = []
     total = len(lines)
     step = max(1, window_lines - overlap)
@@ -35,11 +144,96 @@ def chunk_file(file_path: Path, window_lines: int = 30, overlap: int = 5) -> lis
             "start_line": start + 1,
             "end_line": end,
             "content": chunk_text,
+            "chunk_type": "sliding_window",
         })
         if end >= total:
             break
 
     return chunks
+
+
+def _chunk_ast(
+    raw_bytes: bytes,
+    lines: list[str],
+    file_path: Path,
+    language: str,
+    max_chunk_lines: int = 70,
+) -> list[dict]:
+    """Extract complete syntactic blocks (functions, classes, impls) via AST."""
+    try:
+        from tree_sitter_languages import get_parser
+        parser = get_parser(language)
+        tree = parser.parse(raw_bytes)
+    except Exception:
+        return []
+
+    target_types = AST_BOUNDARY_NODES.get(language, set())
+    if not target_types:
+        return []
+
+    ast_chunks = []
+    covered_ranges = []
+
+    def visit(node):
+        if node.type in target_types:
+            s_line = node.start_point[0] + 1
+            e_line = node.end_point[0] + 1
+
+            # Avoid tiny 1-line noise or comments
+            if e_line >= s_line:
+                node_lines_count = e_line - s_line + 1
+
+                # If block is reasonably sized, keep intact
+                if node_lines_count <= max_chunk_lines:
+                    chunk_text = "\n".join(lines[s_line - 1:e_line])
+                    ast_chunks.append({
+                        "file": str(file_path),
+                        "start_line": s_line,
+                        "end_line": e_line,
+                        "content": chunk_text,
+                        "chunk_type": f"ast_{node.type}",
+                    })
+                    covered_ranges.append((s_line, e_line))
+                    return  # Do not recurse into already captured sub-methods
+
+        # Recurse children to find nested functions/classes
+        for child in node.children:
+            visit(child)
+
+    visit(tree.root_node)
+
+    # Sort chunks by starting line
+    ast_chunks.sort(key=lambda x: x["start_line"])
+    return ast_chunks
+
+
+def chunk_file(file_path: Path, window_lines: int = 30, overlap: int = 5) -> list[dict]:
+    """Chunk a file into semantic units.
+
+    1. Detects file language automatically.
+    2. Uses tree-sitter AST to extract complete function/class/impl boundaries.
+    3. Falls back to sliding windows for non-code files, syntax errors, or unhandled gaps.
+    """
+    if not file_path.exists() or file_path.is_dir():
+        return []
+
+    try:
+        raw_bytes = file_path.read_bytes()
+        lines = raw_bytes.decode("utf-8", errors="replace").splitlines()
+    except Exception:
+        return []
+
+    if not lines:
+        return []
+
+    lang = detect_language(file_path)
+    if lang in AST_BOUNDARY_NODES:
+        ast_chunks = _chunk_ast(raw_bytes, lines, file_path, lang)
+        if ast_chunks:
+            return ast_chunks
+
+    # Fallback: Sliding window for plain text, markdown, config, or unparsed code
+    return _chunk_sliding_window(lines, file_path, window_lines=window_lines, overlap=overlap)
 
 
 def score_snippet(query: str, snippet: dict) -> float:

@@ -150,7 +150,7 @@ Once registered, Claude Code has instant access to 14 System 1 tools:
 See the complete [Tool Reference](docs/tools.md) for full parameter schemas, input/output structures, and decision thresholds.
 
 1. **Check Violation**: Intercepts shell commands and file edits before execution, blocking security risks, credentials/secrets, and destructive commands (`rm -rf`, database drops).
-2. **Surgical Retrieval (jevgrep)**: Scans target files in 20–30 line sliding windows and scores them against user intent, returning strictly relevant snippets instead of full multi-KB files.
+2. **Surgical Retrieval (jevgrep)**: Automatically detects programming language and extracts complete syntactic blocks (functions, classes, impls) via tree-sitter AST, scoring them locally via Laya in ~30ms to extract strictly relevant code.
 3. **Context Compactor**: Strips ephemeral terminal noise, progress bars, download spinners, and repetitive logs from command outputs or transcripts.
 4. **Trajectory Pruner**: Compacts multi-turn conversation transcripts, pruning resolved error loops and transient search noise while keeping active state intact.
 5. **File Ranker**: Scores candidate file paths against task intent to prioritize the top 1–2 files for the agent to inspect.
@@ -332,7 +332,6 @@ See the dedicated [Roadmap](docs/ROADMAP.md) for active optimizations in progres
 - **Cross-Turn Intent Drift Alarm**: Proactive course-correction when multi-turn execution wanders off-topic.
 - **Speculate-and-Verify Tool Prefetching**: Predicts and runs read-only diagnostic actions in the background.
 - **Ephemeral Scratchpad Auto-Janitor**: Cleans disposable scratch files and temp scripts after turn completion.
-- **AST-Aware Chunking for Surgical Retrieval**: Function- and class-level syntax boundary chunking for `jevgrep`.
 
 
 

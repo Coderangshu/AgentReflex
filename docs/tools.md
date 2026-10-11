@@ -18,13 +18,13 @@ Each tool runs locally against the resident Laya daemon in sub-50ms on GPU (MPS/
      - `score`: Confidence score (`0.0` to `1.0`).
 
 2. Surgical Code Retrieval (jevgrep)
-   - **What it does**: Performs semantic code retrieval across target files by sliding 20–30 line windows and scoring each against the user's intent. Returns only the strictly relevant lines rather than loading entire multi-KB files into LLM context.
+   - **What it does**: Performs semantic code retrieval across target files. Automatically detects file language (Rust, Python, TypeScript, Go, C/C++, Java) and extracts complete syntactic blocks (functions, classes, impl blocks) via tree-sitter AST, falling back to sliding windows for plain text or markup. Scores snippets locally via Laya in ~30ms, returning strictly relevant code.
    - **User Skill Access**: Usable via skill **`/reflex-grep`** (or `skills/reflex-grep/run.py`).
    - **Input**:
      - `query`: Search intent or target logic description.
      - `paths`: List of files or directories to search.
    - **Output**:
-     - `snippets`: Ranked list of matches containing file path, line numbers (`start_line` to `end_line`), snippet text, and relevance score.
+     - `snippets`: Ranked list of matches containing file path, line numbers (`start_line` to `end_line`), snippet text, chunk type (`ast_function_item`, `ast_class_definition`, etc.), and relevance score.
 
 3. Context Compactor
    - **What it does**: Prunes disposable terminal noise, progress bars, package download spinners, and repetitive logs from command outputs or conversation transcript steps.
