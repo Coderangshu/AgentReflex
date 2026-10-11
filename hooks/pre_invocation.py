@@ -13,6 +13,8 @@ from lib.trajectory_pruner import (
 from lib.speculative_triage import triage_task
 from lib.action_cache import lookup_action_cache
 from lib.model_router import route_model
+from lib.tool_prefetch import predict_speculative_action
+from lib.client import trigger_prefetch
 try:
     from lib.server_logger import (
         log_activity,
@@ -166,6 +168,15 @@ def main():
                 router_msg = router_res["summary_tag"]
                 context_parts.append(router_msg)
                 inject_steps.append({"ephemeralMessage": router_msg})
+
+            # 2e. Speculative Tool Prefetch Trigger (Background execution over UDS)
+            spec_action = predict_speculative_action(user_prompt, cwd=project_dir or "")
+            if spec_action:
+                trigger_prefetch(
+                    tool=spec_action.get("tool"),
+                    args=spec_action.get("args", {}),
+                    cwd=project_dir or "",
+                )
 
         full_context = "\n".join(context_parts)
         response = {

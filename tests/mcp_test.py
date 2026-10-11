@@ -42,8 +42,9 @@ class TestMCPServer(unittest.TestCase):
         res = self.rpc("tools/list")
         tools = res["result"]["tools"]
         tool_names = [t["name"] for t in tools]
-        self.assertEqual(len(tool_names), 15)
+        self.assertEqual(len(tool_names), 16)
         self.assertIn("reflex_intent_drift", tool_names)
+        self.assertIn("reflex_prefetch", tool_names)
         self.assertIn("reflex_check_violations", tool_names)
         self.assertIn("reflex_grep", tool_names)
         self.assertIn("reflex_review_gate", tool_names)

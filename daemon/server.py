@@ -4,6 +4,7 @@ import os
 import socket
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any, Optional
 import torch
@@ -93,6 +94,70 @@ def get_recent_logs(lines: int = 50):
         return {"lines": all_lines[-lines:], "total_lines": len(all_lines)}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# Speculative execution cache in daemon memory: key -> {"status": "running"|"done", "data": ..., "t0": ...}
+speculative_cache: dict[str, dict] = {}
+speculative_lock = threading.Lock()
+
+
+class PrefetchTriggerPayload(BaseModel):
+    tool: str
+    args: dict = {}
+    cwd: str = ""
+
+
+class PrefetchClaimPayload(BaseModel):
+    tool: str
+    args: dict = {}
+
+
+@app.post("/prefetch/trigger")
+def prefetch_trigger(payload: PrefetchTriggerPayload):
+    from lib.tool_prefetch import hash_tool_call, is_safe_prefetch_action, execute_speculative_action
+
+    if not is_safe_prefetch_action(payload.tool, payload.args):
+        return {"status": "rejected", "reason": "unsafe_or_mutating_action"}
+
+    key = hash_tool_call(payload.tool, payload.args)
+    with speculative_lock:
+        if key in speculative_cache:
+            return {"status": "already_cached", "key": key}
+        speculative_cache[key] = {"status": "running", "t0": time.time()}
+
+    def _worker():
+        res = execute_speculative_action(payload.tool, payload.args, cwd=payload.cwd)
+        with speculative_lock:
+            speculative_cache[key] = {"status": "done", "result": res, "t0": time.time()}
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    return {"status": "started", "key": key}
+
+
+@app.post("/prefetch/claim")
+def prefetch_claim(payload: PrefetchClaimPayload):
+    from lib.tool_prefetch import hash_tool_call
+
+    key = hash_tool_call(payload.tool, payload.args)
+    with speculative_lock:
+        item = speculative_cache.pop(key, None)
+
+    if not item:
+        return {"hit": False}
+
+    if item.get("status") == "done":
+        return {"hit": True, "result": item.get("result")}
+
+    return {"hit": False, "status": "still_running"}
+
+
+@app.post("/prefetch/invalidate")
+def prefetch_invalidate():
+    with speculative_lock:
+        count = len(speculative_cache)
+        speculative_cache.clear()
+    return {"status": "cleared", "invalidated_count": count}
 
 
 @app.post("/predict")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import json
+import re
 from pathlib import Path
 
 # Add project root to sys.path
@@ -17,6 +18,7 @@ from lib.loop_detector import check_agent_loop
 from lib.warden_governor import evaluate_trajectory_governor
 from lib.param_validator import validate_tool_call
 from lib.intent_drift import check_intent_drift
+from lib.client import claim_prefetch, invalidate_prefetch
 try:
     from lib.server_logger import (
         log_activity,
@@ -161,14 +163,15 @@ def main():
             "view_image",
         }
         cmd_str = (args.get("CommandLine") or args.get("commandLine") or "").lower()
-        is_dev_verification = any(k in cmd_str for k in ("unittest", "pytest", "git status", "git diff", "git log", "make test", "npm test"))
+        is_dev_verification = any(k in cmd_str for k in ("unittest", "pytest", "git", "make test", "npm test", "python"))
 
-        # Skip drift check if goal is very short/conversational (<= 25 chars like "ok implement this")
-        is_short_prompt = len(user_goal.strip()) <= 25
+        # Strip time metadata strings from user_goal for accurate prompt length check
+        clean_goal = re.sub(r"The current local time is:.*", "", user_goal, flags=re.DOTALL).strip() if user_goal else ""
+        is_short_prompt = len(clean_goal) <= 35
 
-        if user_goal and not is_short_prompt and len(recent_actions) >= 3 and tool_name not in READ_ONLY_TOOLS and not is_dev_verification:
+        if clean_goal and not is_short_prompt and len(recent_actions) >= 3 and tool_name not in READ_ONLY_TOOLS and not is_dev_verification:
             drift_res = check_intent_drift(
-                primary_goal=user_goal,
+                primary_goal=clean_goal,
                 recent_actions=recent_actions,
                 proposed_tool=tool_name,
                 proposed_args=args,
@@ -212,6 +215,17 @@ def main():
             or ""
         )
         content = command or edit
+
+        # 5. Speculative Prefetch Claim / Invalidation
+        if edit or (command and not any(command.strip().startswith(p) for p in ("git status", "git diff", "git log", "git branch", "pytest --collect-only"))):
+            # Mutating action: instantly invalidate any cached speculative prefetch
+            invalidate_prefetch()
+        elif tool_name in READ_ONLY_TOOLS or (command and any(command.strip().startswith(p) for p in ("git status", "git diff", "git log", "git branch"))):
+            claim_res = claim_prefetch(tool_name, args)
+            if claim_res.get("hit"):
+                # Pre-computed output verified and available in RAM
+                emit_decision("allow")
+                return
 
         if not content:
             emit_decision("allow")

@@ -1,0 +1,46 @@
+{
+  "crud_ops": {
+    "CREATE_file": {
+      "time_ms": 0.094,
+      "bytes": 283
+    },
+    "READ_file": {
+      "time_ms": 0.026,
+      "lines": 7
+    },
+    "UPDATE_file": {
+      "time_ms": 0.06,
+      "bytes": 313
+    },
+    "DELETE_file": {
+      "time_ms": 0.039
+    }
+  },
+  "search_ops": {
+    "query": "NoteViewSet",
+    "without_agentreflex": {
+      "strategy": "Full file read / raw dump",
+      "time_ms": 0.052,
+      "context_tokens_dumped": 2006,
+      "matches_found": 0
+    },
+    "with_agentreflex": {
+      "strategy": "Tree-sitter AST syntax boundary + Laya scoring",
+      "time_ms": 2052.963,
+      "context_tokens_dumped": 263,
+      "snippets_returned": 2,
+      "token_reduction_pct": 86.9
+    }
+  },
+  "speculative_prefetch": {
+    "target_tool": "view_file",
+    "target_args": {
+      "AbsolutePath": "/Users/angshuman/git/doomsday/projects/notemaking/api/views.py"
+    },
+    "prediction_time_ms": 1044.297,
+    "without_prefetch_tool_exec_ms": 0.345,
+    "with_prefetch_claim_time_ms": 0.071,
+    "latency_speedup_x": 4.9,
+    "cache_hit": true
+  }
+}

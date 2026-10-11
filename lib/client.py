@@ -86,3 +86,23 @@ def query_laya(state: str, questions: dict, timeout: float = 10.0) -> dict:
             return {}
     except Exception:
         return {}
+
+
+def trigger_prefetch(tool: str, args: dict, cwd: str = "", timeout: float = 2.0) -> dict:
+    """Send speculative prefetch trigger to daemon over UDS."""
+    payload_bytes = json.dumps({"tool": tool, "args": args, "cwd": cwd}).encode("utf-8")
+    uds_res = _query_uds("/prefetch/trigger", payload_bytes=payload_bytes, method="POST", timeout=timeout)
+    return uds_res or {}
+
+
+def claim_prefetch(tool: str, args: dict, timeout: float = 2.0) -> dict:
+    """Claim speculative prefetch result from daemon over UDS."""
+    payload_bytes = json.dumps({"tool": tool, "args": args}).encode("utf-8")
+    uds_res = _query_uds("/prefetch/claim", payload_bytes=payload_bytes, method="POST", timeout=timeout)
+    return uds_res or {}
+
+
+def invalidate_prefetch(timeout: float = 1.0) -> dict:
+    """Invalidate all speculative cache entries in daemon over UDS on mutating actions."""
+    uds_res = _query_uds("/prefetch/invalidate", payload_bytes=b"{}", method="POST", timeout=timeout)
+    return uds_res or {}

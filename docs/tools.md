@@ -180,3 +180,17 @@ Each tool runs locally against the resident Laya daemon in sub-50ms on GPU (MPS/
       - `drift_status`: `"aligned"` or `"drifting"`.
       - `warning`: Remediation warning prompt when drift is detected.
 
+19. Speculate-and-Verify Tool Prefetching
+    - **What it does**: Predicts likely read-only diagnostic actions (`view_file`, `git status`) via resident Laya scoring and triggers speculative execution in the background via the AgentReflex daemon over UDS, cutting execution latency to 0ms upon tool emission.
+    - **Input**:
+      - `action`: `"predict"` (anticipate next read-only tool), `"claim"` (retrieve cached output), or `"invalidate"` (clear cache on mutating edit).
+      - `prompt`: User prompt or intent (when action is `"predict"`).
+      - `tool_name`: Target tool name (when action is `"claim"`).
+      - `tool_args`: Target tool arguments (when action is `"claim"`).
+      - `cwd`: Working directory path.
+    - **Output**:
+      - `predicted`: Predicted tool call and confidence score.
+      - `daemon_trigger`: Status of background execution dispatch.
+      - `hit`: Boolean indicating whether pre-computed result was claimed.
+      - `result`: Cached tool execution stdout and exit code.
+

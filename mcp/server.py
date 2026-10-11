@@ -36,7 +36,8 @@ from lib.param_validator import validate_tool_call
 from lib.action_cache import lookup_action_cache, cache_action_sequence
 from lib.model_router import route_model
 from lib.intent_drift import check_intent_drift
-from lib.client import is_daemon_alive
+from lib.tool_prefetch import predict_speculative_action, is_safe_prefetch_action
+from lib.client import is_daemon_alive, trigger_prefetch, claim_prefetch, invalidate_prefetch
 
 logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
 
@@ -371,6 +372,41 @@ TOOLS = [
             "required": ["primary_goal"],
         },
     },
+    {
+        "name": "reflex_prefetch",
+        "description": "Speculate-and-Verify Tool Prefetching. Predicts likely read-only diagnostic actions (view_file, git status) from user intent, triggering background speculative execution via UDS daemon to eliminate tool latency.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["predict", "claim", "invalidate"],
+                    "description": "'predict' to anticipate next read-only tool, 'claim' to retrieve pre-computed result, 'invalidate' to clear cache",
+                },
+                "prompt": {
+                    "type": "string",
+                    "description": "User prompt or intent (required for action='predict')",
+                    "default": "",
+                },
+                "tool_name": {
+                    "type": "string",
+                    "description": "Target tool name (required for action='claim')",
+                    "default": "",
+                },
+                "tool_args": {
+                    "type": "object",
+                    "description": "Target tool arguments (required for action='claim')",
+                    "default": {},
+                },
+                "cwd": {
+                    "type": "string",
+                    "description": "Optional working directory",
+                    "default": "",
+                },
+            },
+            "required": ["action"],
+        },
+    },
 ]
 
 
@@ -495,6 +531,29 @@ def handle_call_tool(name: str, arguments: dict) -> dict:
             proposed_args=proposed_args,
         )
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+
+    elif name in ("reflex_prefetch", "sys1_prefetch"):
+        act = arguments.get("action", "predict")
+        if act == "predict":
+            prompt = arguments.get("prompt", "")
+            cwd = arguments.get("cwd", "")
+            spec = predict_speculative_action(prompt, cwd=cwd)
+            if spec:
+                trigger_res = trigger_prefetch(spec["tool"], spec["args"], cwd=cwd)
+                res = {"predicted": spec, "daemon_trigger": trigger_res}
+            else:
+                res = {"predicted": None}
+            return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+        elif act == "claim":
+            t_name = arguments.get("tool_name", "")
+            t_args = arguments.get("tool_args", {})
+            res = claim_prefetch(t_name, t_args)
+            return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+        elif act == "invalidate":
+            res = invalidate_prefetch()
+            return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+        else:
+            return {"isError": True, "content": [{"type": "text", "text": f"Unknown prefetch action: {act}"}]}
 
     else:
         return {
