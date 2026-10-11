@@ -16,6 +16,7 @@ from lib.secret_scan import (
 from lib.loop_detector import check_agent_loop
 from lib.warden_governor import evaluate_trajectory_governor
 from lib.param_validator import validate_tool_call
+from lib.model_router import route_model
 
 
 def parse_transcript_history(transcript_path_str: str) -> tuple[list[dict], int, str]:
@@ -124,7 +125,33 @@ def main():
             )
             return
 
-        # 3. Extract modified code or command across standard parameter names
+        # 3. Dynamic Subagent Model Tier Overwrite (invoke_subagent)
+        if tool_name == "invoke_subagent":
+            subagents = args.get("Subagents", [])
+            has_mod = False
+            for sa in subagents:
+                sa_prompt = sa.get("Prompt", "")
+                current_model = sa.get("Model", "inherit")
+                # If model is unspecified or set to default/inherit/pro, dynamically route
+                if current_model in ("inherit", "pro", ""):
+                    route_decision = route_model(sa_prompt)
+                    target_model = route_decision.get("subagent_model", "flash")
+                    if target_model != current_model:
+                        sa["Model"] = target_model
+                        has_mod = True
+            if has_mod:
+                print(
+                    json.dumps(
+                        {
+                            "decision": "allow",
+                            "allow_tool": True,
+                            "overwrite": {"Subagents": subagents},
+                        }
+                    )
+                )
+                return
+
+        # 4. Extract modified code or command across standard parameter names
         command = args.get("commandLine") or args.get("CommandLine") or ""
         edit = (
             args.get("content")

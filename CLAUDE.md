@@ -32,4 +32,8 @@ This project is connected to the local `AgentReflex` decision engine via MCP (`r
 - For recurring diagnostic checks (e.g., test suite runs, linter passes, schema inspections), call `reflex_action_cache` with `{"action": "lookup", "intent": "..."}` to retrieve verified tool sequences instantly with 0 LLM planning tokens.
 - After completing routine diagnostic workflows successfully, save the sequence via `reflex_action_cache` with `{"action": "save", "intent": "...", "actions": [...]}`.
 
+## 10. Dynamic Model Tier & Reasoning Effort Router
+- When planning multi-step work or spawning subagents, call `reflex_route_model` with `{"prompt": "..."}` to determine whether the task needs `flash`, `standard`, or `frontier` capabilities and the appropriate thinking token budget.
+
+
 

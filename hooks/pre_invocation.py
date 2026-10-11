@@ -10,6 +10,7 @@ from lib.compaction import score_message_retention
 from lib.trajectory_pruner import prune_trajectory
 from lib.speculative_triage import triage_task
 from lib.action_cache import lookup_action_cache
+from lib.model_router import route_model
 
 AUTO_COMPACT_SIZE_THRESHOLD_BYTES = 50 * 1024  # 50 KB
 
@@ -135,6 +136,13 @@ def main():
                 )
                 context_parts.append(cache_msg)
                 inject_steps.append({"ephemeralMessage": cache_msg})
+
+            # 5. Dynamic Model Tier & Effort Router
+            router_res = route_model(user_prompt)
+            if router_res.get("summary_tag"):
+                router_msg = router_res["summary_tag"]
+                context_parts.append(router_msg)
+                inject_steps.append({"ephemeralMessage": router_msg})
 
         full_context = "\n".join(context_parts)
         response = {

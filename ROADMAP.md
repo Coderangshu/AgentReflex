@@ -4,19 +4,19 @@ This roadmap tracks planned and partially implemented System 1 (sub-30ms local d
 
 ---
 
-## 1. Dynamic Model Tier Router `[NEW]`
+## 1. Dynamic Model Tier & Effort Router `[IMPLEMENTED]`
 
-- **Status**: Not Implemented
-- **Target Module**: `lib/model_router.py`
+- **Status**: Implemented & Verified
+  - *Module*: `lib/model_router.py`
+  - *Hooks*: Integrated into `hooks/pre_invocation.py` and `hooks/pre_tool_enforcer.py`
+  - *MCP*: Exposed as `reflex_route_model` in `mcp/server.py`
+- **Target Module*: `lib/model_router.py`
 - **What Problem It Solves**:
   Frontier reasoning models (`Claude 3.7 Sonnet`, `o3`, `GPT-5`) cost 15x–30x more and run 5x–10x slower than fast flash tiers (`Claude 3.5 Haiku`, `gemini-2.5-flash`). Most agent turns (formatting, minor bug fixes, docstrings, routine CRUD) do not need frontier reasoning.
 - **System 1 Decision Logic**:
   - **Input**: User prompt, target file paths, recent diff.
-  - **Decision (`choice`)**:
-    - `flash`: Single-line fixes, docstrings, boilerplate, simple questions.
-    - `standard`: Single-file component work, standard unit tests, endpoint logic.
-    - `frontier`: Multi-file refactors, concurrency/race conditions, architectural changes.
-  - **Action**: Routes the turn to the optimal model tier before execution.
+  - **Decision (`choice`)**: Classifies into 8-class taxonomy (`doc_typo`, `ops_script`, `simple_inspect`, `routine_crud`, `review_audit`, `complex_refactor`, `hard_debug`, `arch_design`).
+  - **Action**: Maps to optimal model tier (`flash`, `standard`, `frontier`), reasoning effort (`none`, `low`, `medium`, `high`), thinking token budget, and subagent target before execution.
 - **Latency & Impact**:
   - ~30ms locally on MPS/GPU.
   - **60%–80% cost reduction** across multi-turn agent sessions.
@@ -175,7 +175,7 @@ This roadmap tracks planned and partially implemented System 1 (sub-30ms local d
 
 | Phase | Capability | Target Module | Status | Existing Foundation |
 | :---: | :--- | :--- | :--- | :--- |
-| **1** | **Dynamic Model Tier Router** | `lib/model_router.py` | `[NEW]` | None (Greenfield) |
+| **1** | **Dynamic Model Tier Router** | `lib/model_router.py` | `[DONE]` | Complete (`lib/model_router.py`, hooks, MCP) |
 | **2** | **Trajectory & History Pruner** | `lib/trajectory_pruner.py` | `[DONE]` | Complete (`lib/trajectory_pruner.py`, hook, MCP) |
 | **3** | **Hallucinated Tool Call Gate** | `lib/param_validator.py` | `[DONE]` | Complete (`lib/param_validator.py`, hooks, MCP) |
 | **4** | **Automated Stop / Done Validator** | `lib/done_validator.py` | `[DONE]` | Complete (`lib/done_validator.py`, MCP) |

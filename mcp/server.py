@@ -34,6 +34,7 @@ from lib.done_validator import validate_task_completion
 from lib.speculative_triage import triage_task
 from lib.param_validator import validate_tool_call
 from lib.action_cache import lookup_action_cache, cache_action_sequence
+from lib.model_router import route_model
 from lib.client import is_daemon_alive
 
 logging.basicConfig(level=logging.ERROR, stream=sys.stderr)
@@ -320,6 +321,20 @@ TOOLS = [
             "required": ["action", "intent"],
         },
     },
+    {
+        "name": "reflex_route_model",
+        "description": "Dynamic Model Tier & Effort Router. Classifies software engineering prompt across 8 task categories and outputs the optimal model tier (flash, standard, frontier), reasoning effort, thinking token budget, and subagent target.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "User task prompt to classify and route",
+                },
+            },
+            "required": ["prompt"],
+        },
+    },
 ]
 
 
@@ -425,6 +440,11 @@ def handle_call_tool(name: str, arguments: dict) -> dict:
         else:
             cached = lookup_action_cache(intent)
             return {"content": [{"type": "text", "text": json.dumps(cached or {"cache_hit": False, "intent": intent}, indent=2)}]}
+
+    elif name in ("reflex_route_model", "sys1_route_model"):
+        prompt = arguments.get("prompt", "")
+        res = route_model(prompt)
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 
     else:
         return {

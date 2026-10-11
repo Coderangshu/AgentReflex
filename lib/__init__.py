@@ -17,6 +17,7 @@ from lib.done_validator import validate_task_completion
 from lib.speculative_triage import triage_task
 from lib.param_validator import validate_tool_call
 from lib.action_cache import lookup_action_cache, cache_action_sequence
+from lib.model_router import route_model
 
 __all__ = [
     "query_laya",
@@ -44,4 +45,5 @@ __all__ = [
     "validate_tool_call",
     "lookup_action_cache",
     "cache_action_sequence",
+    "route_model",
 ]

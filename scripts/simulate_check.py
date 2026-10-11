@@ -197,11 +197,22 @@ def main():
         f"hit '{cache_hit.get('matched_intent')}' with {cache_hit.get('action_count')} cached action(s)",
     )
 
+    # 13. Dynamic Model Tier & Effort Router
+    from lib.model_router import route_model
+    route_res = route_model("Fix typo in README documentation")
+    route_pass = route_res.get("task_class") == "doc_typo" and route_res.get("model_tier") == "flash"
+    print_status(
+        "13. Dynamic Model Tier Router",
+        route_pass,
+        f"class: {route_res.get('task_class')} -> tier: {route_res.get('model_tier')} (effort: {route_res.get('reasoning_effort')})",
+    )
+
     print(f"\n{BOLD}=== Simulation Complete ==={RESET}\n")
 
 
 if __name__ == "__main__":
     main()
+
 
 
 
