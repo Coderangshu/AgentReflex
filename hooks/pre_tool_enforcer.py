@@ -16,7 +16,26 @@ from lib.secret_scan import (
 from lib.loop_detector import check_agent_loop
 from lib.warden_governor import evaluate_trajectory_governor
 from lib.param_validator import validate_tool_call
-from lib.model_router import route_model
+try:
+    from lib.server_logger import (
+        log_activity,
+        resolve_project_name,
+        resolve_agent_name,
+        resolve_project_dir,
+    )
+except Exception:
+    def log_activity(*args, **kwargs):
+        pass
+
+    def resolve_project_name(*args, **kwargs):
+        return "default"
+
+    def resolve_agent_name(*args, **kwargs):
+        return "agent"
+
+    def resolve_project_dir(*args, **kwargs):
+        return None
+
 
 
 def parse_transcript_history(transcript_path_str: str) -> tuple[list[dict], int, str]:
@@ -46,7 +65,7 @@ def parse_transcript_history(transcript_path_str: str) -> tuple[list[dict], int,
                 item_type = item.get("type", "")
 
                 # Reset turn counter and update active goal whenever user inputs new prompt
-                if item_type in ("USER_INPUT", "user"):
+                if item_type in ("USER_INPUT", "user", "USER_PROMPT", "USER") or item.get("source") in ("USER_EXPLICIT", "USER"):
                     turn_tool_calls = 0
                     current_turn_goal = str(item.get("content", ""))[:300]
                     continue
@@ -81,10 +100,38 @@ def main():
         tool_name = tool_call.get("name", "")
         args = tool_call.get("args", {})
 
-        # 1. Trajectory & Tool Budget Governor Check
+        # Extract project and agent identities for centralized server logging
         transcript_path = data.get("transcriptPath")
+        cwd_dir = args.get("Cwd") or args.get("cwd") or data.get("cwd") or args.get("working_directory")
+        project_dir = resolve_project_dir(data.get("workspacePaths"), cwd_dir, transcript_path)
+        project = resolve_project_name(data.get("workspacePaths"), cwd_dir, transcript_path)
+        agent = resolve_agent_name(data.get("modelName"), data.get("conversationId"))
+
+        def emit_decision(decision: str, reason: str = "", overwrite: dict = None):
+            allow = (decision == "allow")
+            payload = {"decision": decision, "allow_tool": allow}
+            if reason:
+                payload["reason"] = reason
+                payload["deny_reason"] = reason
+            if overwrite:
+                payload["overwrite"] = overwrite
+
+            status = "allowed" if allow else "denied"
+            resp = f"BLOCKED: {reason}" if not allow else "CALL_ALLOWED"
+            log_activity(
+                project=project,
+                agent=agent,
+                tool=tool_name,
+                args=args,
+                response=resp,
+                status=status,
+                project_dir=project_dir,
+            )
+            print(json.dumps(payload))
+
+        # 1. Trajectory & Tool Budget Governor Check
         recent_actions, turn_tool_calls, user_goal = parse_transcript_history(transcript_path)
-        
+
         gov_res = evaluate_trajectory_governor(
             task_goal=user_goal,
             recent_actions=recent_actions,
@@ -95,34 +142,14 @@ def main():
 
         if not gov_res.get("allow_action", True):
             reason = gov_res.get("reason", "Trajectory budget governor intervention")
-            # Only emit valid protobuf fields expected by protojson unmarshaler
-            print(
-                json.dumps(
-                    {
-                        "decision": "deny",
-                        "reason": reason,
-                        "allow_tool": False,
-                        "deny_reason": reason,
-                    }
-                )
-            )
+            emit_decision("deny", reason)
             return
 
         # 2. Hallucinated Tool Call & Parameter Gate
-        cwd_dir = args.get("Cwd") or args.get("cwd") or args.get("working_directory")
         param_res = validate_tool_call(tool_name, args, cwd=cwd_dir)
         if not param_res.get("is_valid", True):
             reason = f"AgentReflex Param Gate: {param_res.get('reason')} Suggestion: {param_res.get('suggestion')}"
-            print(
-                json.dumps(
-                    {
-                        "decision": "deny",
-                        "reason": reason,
-                        "allow_tool": False,
-                        "deny_reason": reason,
-                    }
-                )
-            )
+            emit_decision("deny", reason)
             return
 
         # 3. Dynamic Subagent Model Tier Overwrite (invoke_subagent)
@@ -140,15 +167,7 @@ def main():
                         sa["Model"] = target_model
                         has_mod = True
             if has_mod:
-                print(
-                    json.dumps(
-                        {
-                            "decision": "allow",
-                            "allow_tool": True,
-                            "overwrite": {"Subagents": subagents},
-                        }
-                    )
-                )
+                emit_decision("allow", overwrite={"Subagents": subagents})
                 return
 
         # 4. Extract modified code or command across standard parameter names
@@ -163,56 +182,29 @@ def main():
         content = command or edit
 
         if not content:
-            print(json.dumps({"decision": "allow", "allow_tool": True}))
+            emit_decision("allow")
             return
 
         if command:
             if has_destructive_command(command):
-                print(
-                    json.dumps(
-                        {
-                            "decision": "deny",
-                            "reason": DESTRUCTIVE_CMD_REASON,
-                            "allow_tool": False,
-                            "deny_reason": DESTRUCTIVE_CMD_REASON,
-                        }
-                    )
-                )
+                emit_decision("deny", DESTRUCTIVE_CMD_REASON)
                 return
         else:
             # File edit: deterministic secret check, and skip the model on short snippets it over-scores
             if has_hardcoded_secret(edit):
-                print(
-                    json.dumps(
-                        {
-                            "decision": "deny",
-                            "reason": SECRET_REASON,
-                            "allow_tool": False,
-                            "deny_reason": SECRET_REASON,
-                        }
-                    )
-                )
+                emit_decision("deny", SECRET_REASON)
                 return
             if len(edit) < MIN_EDIT_CHARS_FOR_MODEL:
-                print(json.dumps({"decision": "allow", "allow_tool": True}))
+                emit_decision("allow")
                 return
 
         result = check_violations(content)
 
         if result.get("violates", False):
             reason = result.get("reason", "AgentReflex rule guardrail triggered")
-            print(
-                json.dumps(
-                    {
-                        "decision": "deny",
-                        "reason": reason,
-                        "allow_tool": False,
-                        "deny_reason": reason,
-                    }
-                )
-            )
+            emit_decision("deny", reason)
         else:
-            print(json.dumps({"decision": "allow", "allow_tool": True}))
+            emit_decision("allow")
     except Exception:
         print(json.dumps({"decision": "allow", "allow_tool": True}))
 

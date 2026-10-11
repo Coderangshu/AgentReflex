@@ -278,3 +278,69 @@ To ensure zero perceived lag on user turns—especially for rapid, interactive t
 | **Standard Feature** (`add route for login`) | **447 ms** | **381 ms** | **~15% faster** |
 | **Complex Debug** (`deadlock in worker pool`) | **479 ms** | **393 ms** | **~18% faster** |
 | **Complex Review** (`review git diff for bugs`) | **~480 ms** | **389 ms** | **~19% faster** |
+
+---
+
+## 8. Real-World Project Activity Logging
+
+AgentReflex can record an audit trail of agent interactions across your active coding projects:
+- **User Prompts**: Every incoming prompt (`[TOOL: USER_PROMPT]`)
+- **Tool Invocations**: Every tool proposed (`run_command`, `replace_file_content`, `view_file`, etc.)
+- **Guardrail Interceptions**: Blocked actions (`BLOCKED: <reason>`)
+- **Tool Outputs & Responses**: Truncated execution results, exit codes, and errors
+
+### Log Storage & Isolated Layout
+Logs are saved inside the `AgentReflex` repository in [`logs/`](logs/):
+- **Human-Readable Text**: `logs/<project_name>.log` (single line per event, optimized for `tail -f`)
+- **Structured JSON Lines**: `logs/<project_name>.jsonl` (for programmatic queries or metrics)
+- **Daemon Lifecycle Logs**: `logs/server.log` (daemon startup, health, and server events)
+
+Each project writes to its own isolated file (`logs/doomsday.log`, `logs/laya.log`, `logs/AgentReflex.log`), completely eliminating concurrent file write lock contention. Redundant project tags are omitted from line contents since the filename already identifies the project.
+
+### How to Enable Logging (OFF by Default)
+Logging is **disabled by default** (0 disk overhead). You can opt in for any project using any of the following methods:
+
+#### 1. Flag File (Fastest)
+Touch `.reflex-log` in the root of your target project:
+```bash
+touch /path/to/your-project/.reflex-log
+```
+
+#### 2. Project Config
+Create or edit `.agentreflex.json` or `.agents/config.json` in your project root:
+```json
+{
+  "logging": true
+}
+```
+
+#### 3. Hooks Configuration
+Add `"logging": true` under `"reflex-guardrails"` in `.agents/hooks.json`:
+```json
+{
+  "reflex-guardrails": {
+    "logging": true,
+    "PreInvocation": [...],
+    ...
+  }
+}
+```
+
+#### 4. Environment Variable
+Enable globally for a terminal session:
+```bash
+export AGENTREFLEX_LOGGING=1
+```
+
+### Live Log Streaming
+Watch agent activity in real-time while working:
+```bash
+tail -f logs/<project_name>.log
+```
+Example output:
+```text
+[TOOL: run_command] cmd='git status' -> response=CALL_ALLOWED [AGENT: gemini-3.8-flash (test-doo)] [STATUS: allowed] [2026-10-11 17:34:39]
+[TOOL: run_command] cmd='git status' -> response=On branch main, up to date [AGENT: gemini-3.8-flash (test-doo)] [STATUS: success] [2026-10-11 17:34:39]
+[TOOL: USER_PROMPT] {"prompt": "run tests"} -> response=(turn started) [AGENT: gemini-3.8-flash (test-doo)] [STATUS: prompt] [2026-10-11 17:41:03]
+```
+

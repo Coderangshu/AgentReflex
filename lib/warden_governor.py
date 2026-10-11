@@ -146,7 +146,16 @@ def evaluate_trajectory_governor(
         }
 
     # 2. Hard budget overrun checks
-    if max_tool_calls > 0 and total_calls >= max_tool_calls:
+    READ_ONLY_TOOLS = {
+        "view_file",
+        "find_by_name",
+        "grep_search",
+        "read_url_content",
+        "read_resource",
+        "list_resources",
+        "view_image",
+    }
+    if max_tool_calls > 0 and total_calls >= max_tool_calls and proposed_tool not in READ_ONLY_TOOLS:
         return {
             "allow_action": False,
             "governor_status": "TOOL_BUDGET_EXCEEDED",

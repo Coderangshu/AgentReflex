@@ -26,6 +26,7 @@ from lib.secret_scan import (
 )
 from lib.param_validator import validate_tool_call
 from lib.model_router import route_model
+from lib.server_logger import log_activity
 
 # Skill-router labels -> the MCP tools that implement them in Claude Code
 SKILL_TO_TOOLS = {
@@ -63,29 +64,41 @@ def pre_tool_use(data: dict) -> dict:
     tool_name = data.get("tool_name", "")
     tool_input = data.get("tool_input", {})
 
+    project = Path.cwd().name
+
     # For Bash or command executions, check for hallucinated CLI flags
     if tool_name in ("Bash", "run_command"):
         param_res = validate_tool_call(tool_name, tool_input)
         if not param_res.get("is_valid", True):
             msg = f"AgentReflex: {param_res.get('reason')} ({param_res.get('suggestion')})"
+            log_activity(project=project, agent="claude-code", tool=tool_name, args=tool_input, response=f"BLOCKED: {msg}", status="denied")
             return ask(msg)
 
     if tool_name == "Bash":
         content = tool_input.get("command", "")
         if has_destructive_command(content):
+            log_activity(project=project, agent="claude-code", tool=tool_name, args=tool_input, response=f"BLOCKED: {DESTRUCTIVE_CMD_REASON}", status="denied")
             return ask(DESTRUCTIVE_CMD_REASON)
     else:
         content = edited_content(tool_name, tool_input)
         if has_hardcoded_secret(content):
+            log_activity(project=project, agent="claude-code", tool=tool_name, args=tool_input, response=f"BLOCKED: {SECRET_REASON}", status="denied")
             return ask(SECRET_REASON)
         # The model over-scores short snippets (benign 3-line edits hit 90%+), so only trust it on longer edits
         if len(content) < MIN_EDIT_CHARS_FOR_MODEL:
+            log_activity(project=project, agent="claude-code", tool=tool_name, args=tool_input, response="CALL_ALLOWED", status="allowed")
             return {}
     if not content:
+        log_activity(project=project, agent="claude-code", tool=tool_name, args=tool_input, response="CALL_ALLOWED", status="allowed")
         return {}
 
     result = check_violations(content)
-    return ask(result["reason"]) if result.get("violates") else {}
+    if result.get("violates"):
+        log_activity(project=project, agent="claude-code", tool=tool_name, args=tool_input, response=f"BLOCKED: {result['reason']}", status="denied")
+        return ask(result["reason"])
+
+    log_activity(project=project, agent="claude-code", tool=tool_name, args=tool_input, response="CALL_ALLOWED", status="allowed")
+    return {}
 
 
 NON_CODE_EXTS = {
@@ -109,6 +122,18 @@ def post_tool_use(data: dict) -> dict:
     tool_name = data.get("tool_name", "")
     tool_input = data.get("tool_input", {})
     file_path = target_file_path(tool_name, tool_input)
+
+    # Log tool completion to centralized server log
+    project = Path.cwd().name
+    resp = data.get("tool_result") or data.get("result") or data.get("content") or "(completed)"
+    log_activity(
+        project=project,
+        agent="claude-code",
+        tool=tool_name,
+        args=tool_input,
+        response=resp,
+        status="completed",
+    )
 
     # Skip documentation, configs, and non-source files to avoid nagging
     if file_path:

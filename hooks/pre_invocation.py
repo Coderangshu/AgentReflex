@@ -13,6 +13,25 @@ from lib.trajectory_pruner import (
 from lib.speculative_triage import triage_task
 from lib.action_cache import lookup_action_cache
 from lib.model_router import route_model
+try:
+    from lib.server_logger import (
+        log_activity,
+        resolve_project_name,
+        resolve_agent_name,
+        resolve_project_dir,
+    )
+except Exception:
+    def log_activity(*args, **kwargs):
+        pass
+
+    def resolve_project_name(*args, **kwargs):
+        return "default"
+
+    def resolve_agent_name(*args, **kwargs):
+        return "agent"
+
+    def resolve_project_dir(*args, **kwargs):
+        return None
 
 AUTO_COMPACT_SIZE_THRESHOLD_BYTES = 50 * 1024  # 50 KB
 
@@ -88,6 +107,27 @@ def main():
 
         # 2. Dynamic Model Tier, Effort & Skill Router (Single Unified Pass)
         if user_prompt:
+            project_dir = resolve_project_dir(
+                data.get("workspacePaths"),
+                data.get("cwd"),
+                transcript_path,
+            )
+            project = resolve_project_name(
+                data.get("workspacePaths"),
+                data.get("cwd"),
+                transcript_path,
+            )
+            agent = resolve_agent_name(data.get("modelName"), data.get("conversationId"))
+            log_activity(
+                project=project,
+                agent=agent,
+                tool="USER_PROMPT",
+                args={"prompt": user_prompt[:200]},
+                response="(turn started)",
+                status="prompt",
+                project_dir=project_dir,
+            )
+
             router_res = route_model(user_prompt, harness="agy")
             task_class = router_res.get("task_class", "routine_crud")
 

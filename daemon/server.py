@@ -1,13 +1,18 @@
+from __future__ import annotations
 import asyncio
 import os
 import socket
 import sys
 import threading
+from pathlib import Path
+from typing import Any, Optional
 import torch
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from laya import Router
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 DEFAULT_UDS_PATH = os.environ.get("AGENTREFLEX_SOCKET_PATH", "/tmp/agentreflex.sock")
 TCP_HOST = os.environ.get("AGENTREFLEX_HOST", "127.0.0.1")
@@ -35,9 +40,22 @@ router = Router(preload=True, device=DEVICE)
 predict_lock = threading.Lock()
 
 
+from lib.server_logger import log_server_event, log_activity, SERVER_LOG_FILE
+
+
 class DecisionPayload(BaseModel):
     state: str
     questions: dict
+
+
+class ActivityPayload(BaseModel):
+    project: str = ""
+    agent: str = ""
+    tool: str = ""
+    args: Any = {}
+    response: Any = ""
+    status: str = "success"
+    duration_ms: Optional[float] = None
 
 
 @app.get("/health")
@@ -47,7 +65,34 @@ def health():
         "service": "agentreflex",
         "device": DEVICE,
         "socket": DEFAULT_UDS_PATH if os.path.exists(DEFAULT_UDS_PATH) else None,
+        "log_file": str(SERVER_LOG_FILE),
     }
+
+
+@app.post("/log_activity")
+def log_activity_endpoint(payload: ActivityPayload):
+    log_activity(
+        project=payload.project,
+        agent=payload.agent,
+        tool=payload.tool,
+        args=payload.args,
+        response=payload.response,
+        status=payload.status,
+        duration_ms=payload.duration_ms,
+    )
+    return {"status": "logged"}
+
+
+@app.get("/logs")
+def get_recent_logs(lines: int = 50):
+    if not SERVER_LOG_FILE.exists():
+        return {"lines": []}
+    try:
+        content = SERVER_LOG_FILE.read_text(encoding="utf-8", errors="replace")
+        all_lines = [l for l in content.splitlines() if l.strip()]
+        return {"lines": all_lines[-lines:], "total_lines": len(all_lines)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.post("/predict")
@@ -81,9 +126,14 @@ async def run_servers():
         server_uds = uvicorn.Server(config_uds)
         tasks.append(server_uds.serve())
 
+    log_server_event(
+        "STARTUP",
+        f"Daemon listening on device={DEVICE} (tcp={TCP_HOST}:{TCP_PORT}, uds={DEFAULT_UDS_PATH if has_uds else 'none'})",
+    )
     try:
         await asyncio.gather(*tasks)
     finally:
+        log_server_event("SHUTDOWN", "Daemon stopped")
         if has_uds and os.path.exists(DEFAULT_UDS_PATH):
             try:
                 os.remove(DEFAULT_UDS_PATH)

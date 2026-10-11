@@ -9,3 +9,5 @@ dist/
 .daemon.pid
 daemon.log
 .agents
+logs/*.log
+logs/*.jsonl

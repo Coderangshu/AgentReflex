@@ -32,7 +32,7 @@ cat <<EOF > "$TARGET_DIR/.agents/hooks.json"
     ],
     "PreToolUse": [
       {
-        "matcher": "write_file|edit_file|replace_file_content|write_to_file|run_command|command",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
@@ -44,7 +44,7 @@ cat <<EOF > "$TARGET_DIR/.agents/hooks.json"
     ],
     "PostToolUse": [
       {
-        "matcher": "write_file|edit_file|replace_file_content|write_to_file",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
