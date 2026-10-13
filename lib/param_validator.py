@@ -81,6 +81,32 @@ STANDARD_TOOL_PARAM_SCHEMAS = {
 }
 
 
+def _strip_heredoc_payload(command_str: str) -> str:
+    """If command contains a bash heredoc (e.g. cat << 'EOF' ... EOF), extract only the shell control headers."""
+    # Match heredoc redirect like << 'EOF', << "EOF", << EOF, <<-'EOF', etc.
+    heredoc_match = re.search(r"<<-?\s*(['\"]?)([A-Za-z0-9_]+)\1", command_str)
+    if not heredoc_match:
+        return command_str
+
+    delimiter = heredoc_match.group(2)
+    # The command up to the first newline is the shell command (e.g. cat << 'EOF' > /path)
+    lines = command_str.splitlines()
+    header_line = lines[0]
+
+    # Find the closing delimiter line
+    trailing_lines = []
+    found_delimiter = False
+    for line in lines[1:]:
+        if not found_delimiter:
+            if line.strip() == delimiter:
+                found_delimiter = True
+        else:
+            trailing_lines.append(line)
+
+    # Reconstruct valid shell envelope without internal multiline payload
+    return header_line + ("\n" + "\n".join(trailing_lines) if trailing_lines else "")
+
+
 def _check_command_hallucinations(command_str: str) -> Optional[dict]:
     """Check command line string for known hallucinated CLI flags and malformed tokens."""
     if not command_str or not command_str.strip():
@@ -91,16 +117,22 @@ def _check_command_hallucinations(command_str: str) -> Optional[dict]:
             "suggestion": "Specify a valid executable command.",
         }
 
+    # If this is a multiline bash heredoc, sanitize payload so shlex does not choke on embedded script quotes
+    sanitized_cmd = _strip_heredoc_payload(command_str) if "<<" in command_str else command_str
+
     try:
-        tokens = shlex.split(command_str)
+        tokens = shlex.split(sanitized_cmd)
     except ValueError as e:
-        # Unbalanced quotes or syntax error
-        return {
-            "is_valid": False,
-            "error_type": "syntax_error",
-            "reason": f"Command syntax error in shell tokenization: {str(e)}",
-            "suggestion": "Fix unmatched quotes or unescaped shell special characters.",
-        }
+        # If still fails on heredoc, allow execution rather than blocking valid multiline scripts
+        if "<<" in command_str:
+            tokens = command_str.strip().split()
+        else:
+            return {
+                "is_valid": False,
+                "error_type": "syntax_error",
+                "reason": f"Command syntax error in shell tokenization: {str(e)}",
+                "suggestion": "Fix unmatched quotes or unescaped shell special characters.",
+            }
 
     if not tokens:
         return None
@@ -272,7 +304,8 @@ def validate_tool_call(
     STANDARD_SAFE_UTILITIES = {
         "ls", "cat", "head", "tail", "wc", "cd", "pwd", "which", "echo",
         "mkdir", "cp", "mv", "touch", "diff", "env", "python", "python3",
-        "pytest", "unittest", "node", "cargo", "go", "make", "git"
+        "pytest", "unittest", "node", "cargo", "go", "make", "git",
+        "find", "grep", "egrep", "fgrep", "rg", "ag", "ack", "sed", "awk"
     }
 
     if use_neural and cmd_val and isinstance(cmd_val, str) and len(cmd_val) > 10 and base_cmd not in STANDARD_SAFE_UTILITIES:

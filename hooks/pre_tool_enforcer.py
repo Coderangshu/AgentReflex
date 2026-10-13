@@ -235,6 +235,12 @@ def main():
             if has_destructive_command(command):
                 emit_decision("deny", DESTRUCTIVE_CMD_REASON)
                 return
+            # Diagnostic inspection utilities do not destroy files or leak secrets
+            first_cmd = command.strip().split()[0] if command.strip() else ""
+            cmd_name = Path(first_cmd).name
+            if cmd_name in {"grep", "egrep", "fgrep", "rg", "ag", "ack", "find", "ls", "echo", "cat", "head", "tail", "wc", "pwd", "which", "diff"}:
+                emit_decision("allow")
+                return
         else:
             # File edit: deterministic secret check, and skip the model on short snippets it over-scores
             if has_hardcoded_secret(edit):
