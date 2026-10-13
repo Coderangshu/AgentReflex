@@ -96,7 +96,12 @@ def predict_speculative_action(prompt: str, cwd: str = "", recent_actions: list 
         res = query_laya(state, questions)
         action_choice = res.get("action", {}).get("choice", "other")
         probs = res.get("action", {}).get("probabilities", {})
-        choice_prob = probs.get(action_choice, res.get("action", {}).get("confidence", 0.0))
+        choice_prob = (
+            probs.get(action_choice)
+            or res.get("action", {}).get("confidence")
+            or res.get("confidence", {}).get("noul")
+            or 0.0
+        )
 
         # If choice probability >= 0.50 and not other, trigger prefetch
         if choice_prob < 0.50 or action_choice == "other":

@@ -266,20 +266,36 @@ def validate_tool_call(
 
     # 4. Neural verification via Laya for non-trivial commands
     neural_score = 0.0
-    if use_neural and cmd_val and isinstance(cmd_val, str) and len(cmd_val) > 10:
+    # Whitelist standard well-formed POSIX commands if shlex tokenized successfully
+    cmd_tokens = (cmd_val.strip().split() if isinstance(cmd_val, str) else [])
+    base_cmd = Path(cmd_tokens[0]).name if cmd_tokens else ""
+    STANDARD_SAFE_UTILITIES = {
+        "ls", "cat", "head", "tail", "wc", "cd", "pwd", "which", "echo",
+        "mkdir", "cp", "mv", "touch", "diff", "env", "python", "python3",
+        "pytest", "unittest", "node", "cargo", "go", "make", "git"
+    }
+
+    if use_neural and cmd_val and isinstance(cmd_val, str) and len(cmd_val) > 10 and base_cmd not in STANDARD_SAFE_UTILITIES:
         state = f"Command execution request:\ncommand: {cmd_val[:400]}"
         questions = {
-            "is_malformed": {
+            "validity": {
+                "type": "choice",
+                "instructions": "Evaluate if the command syntax is valid executable shell syntax or malformed garbage.",
+                "criteria": {
+                    "valid": "Standard valid shell commands, CLI flags, arguments, or file paths",
+                    "malformed": "Garbage characters, non-existent flags, corrupted token dumps, or invalid syntax",
+                },
+            },
+            "malformed_score": {
                 "type": "noul",
-                "instructions": (
-                    "Is this command completely malformed, broken, or containing garbage syntax?"
-                ),
-            }
+                "instructions": "Rate how certain you are that this command is broken or garbage.",
+            },
         }
         res = query_laya(state, questions)
-        is_malformed = res.get("is_malformed", {}).get("noul", 0.0)
-        neural_score = round(is_malformed, 3)
-        if is_malformed >= 0.85:
+        choice = res.get("validity", {}).get("choice", "valid")
+        malformed_score = res.get("malformed_score", {}).get("noul", 0.0)
+        neural_score = round(malformed_score, 3)
+        if choice == "malformed" and malformed_score >= 0.85:
             return {
                 "is_valid": False,
                 "error_type": "hallucinated_syntax",
