@@ -32,6 +32,7 @@ LANGUAGE_EXTENSIONS = {
     ".tsx": "tsx",
     ".js": "javascript",
     ".jsx": "javascript",
+    ".mjs": "javascript",
     ".go": "go",
     ".c": "c",
     ".cpp": "cpp",
@@ -40,6 +41,10 @@ LANGUAGE_EXTENSIONS = {
     ".h": "c",
     ".hpp": "cpp",
     ".java": "java",
+    ".rb": "ruby",
+    ".php": "php",
+    ".swift": "swift",
+    ".kt": "kotlin",
 }
 
 # Top-level AST node types representing cohesive functional blocks
@@ -113,6 +118,31 @@ AST_BOUNDARY_NODES = {
         "method_declaration",
         "constructor_declaration",
     },
+    "ruby": {
+        "method",
+        "singleton_method",
+        "class",
+        "module",
+    },
+    "php": {
+        "function_definition",
+        "class_declaration",
+        "method_declaration",
+        "interface_declaration",
+        "trait_declaration",
+    },
+    "swift": {
+        "function_declaration",
+        "class_declaration",
+        "struct_declaration",
+        "protocol_declaration",
+        "extension_declaration",
+    },
+    "kotlin": {
+        "function_declaration",
+        "class_declaration",
+        "object_declaration",
+    },
 }
 
 
@@ -166,6 +196,21 @@ def _chunk_sliding_window(
     return chunks
 
 
+def _get_ast_parser(language: str):
+    """Retrieve tree-sitter parser using modern tree_sitter_language_pack with fallback."""
+    try:
+        from tree_sitter_language_pack import get_parser
+        return get_parser(language)
+    except Exception:
+        pass
+
+    try:
+        from tree_sitter_languages import get_parser
+        return get_parser(language)
+    except Exception:
+        return None
+
+
 def _chunk_ast(
     raw_bytes: bytes,
     lines: list[str],
@@ -175,8 +220,9 @@ def _chunk_ast(
 ) -> list[dict]:
     """Extract complete syntactic blocks (functions, classes, impls) via AST."""
     try:
-        from tree_sitter_languages import get_parser
-        parser = get_parser(language)
+        parser = _get_ast_parser(language)
+        if parser is None:
+            return []
         tree = parser.parse(raw_bytes)
     except Exception:
         return []

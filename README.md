@@ -152,7 +152,7 @@ Once registered, Claude Code has instant access to 14 System 1 tools:
 See the complete [Tool Reference](docs/tools.md) for full parameter schemas, input/output structures, and decision thresholds.
 
 1. **Check Violation**: Intercepts shell commands and file edits before execution, blocking security risks, credentials/secrets, and destructive commands (`rm -rf`, database drops).
-2. **Surgical Retrieval (jevgrep)**: Automatically detects programming language and extracts complete syntactic blocks (functions, classes, impls) via tree-sitter AST with SHA-1 content hash manifest memoization, scoring them locally via Laya in ~30ms to extract strictly relevant code.
+2. **Surgical Retrieval (jevgrep)**: Automatically detects programming language (Python, Rust, TypeScript, JavaScript, Go, C/C++, Java, Ruby, PHP, Swift, Kotlin) and extracts complete syntactic blocks (functions, classes, methods, interfaces, impls) via tree-sitter AST with SHA-1 content hash manifest memoization, scoring them locally via Laya in ~30ms to extract strictly relevant code.
 3. **Context Compactor**: Strips ephemeral terminal noise, progress bars, download spinners, and repetitive logs from command outputs or transcripts.
 4. **Trajectory Pruner**: Compacts multi-turn conversation transcripts, pruning resolved error loops and transient search noise while keeping active state intact.
 5. **File Ranker**: Scores candidate file paths against task intent to prioritize the top 1–2 files for the agent to inspect.

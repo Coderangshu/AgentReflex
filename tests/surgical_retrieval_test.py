@@ -55,6 +55,45 @@ def authenticate():
             self.assertIn("ast_class_definition", types)
             self.assertIn("ast_function_definition", types)
 
+    def test_ruby_ast_chunking(self):
+        with tempfile.NamedTemporaryFile("w+", suffix=".rb", delete=False) as tf:
+            tf.write("""class PaymentGateway
+  def process_charge(amount)
+    true
+  end
+end
+
+def refund(id)
+  false
+end
+""")
+            tf.flush()
+            chunks = chunk_file(Path(tf.name))
+            self.assertGreaterEqual(len(chunks), 2)
+            types = [c["chunk_type"] for c in chunks]
+            self.assertIn("ast_class", types)
+            self.assertTrue(any("method" in t for t in types))
+
+    def test_php_ast_chunking(self):
+        with tempfile.NamedTemporaryFile("w+", suffix=".php", delete=False) as tf:
+            tf.write("""<?php
+class OrderService {
+    public function createOrder($cart) {
+        return 1;
+    }
+}
+
+function sendNotification($email) {
+    return true;
+}
+""")
+            tf.flush()
+            chunks = chunk_file(Path(tf.name))
+            self.assertGreaterEqual(len(chunks), 2)
+            types = [c["chunk_type"] for c in chunks]
+            self.assertIn("ast_class_declaration", types)
+            self.assertTrue(any("function" in t or "method" in t for t in types))
+
     def test_markdown_fallback_sliding_window(self):
         with tempfile.NamedTemporaryFile("w+", suffix=".md", delete=False) as tf:
             lines = [f"Documentation line {i}" for i in range(1, 80)]
