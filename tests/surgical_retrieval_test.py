@@ -65,6 +65,40 @@ def authenticate():
             for c in chunks:
                 self.assertEqual(c["chunk_type"], "sliding_window")
 
+    def test_content_hash_manifest_caching(self):
+        from lib.surgical_retrieval import clear_ast_cache, _AST_CHUNK_CACHE, compute_content_hash
+        clear_ast_cache()
+        with tempfile.NamedTemporaryFile("w+", suffix=".py", delete=False) as tf:
+            code1 = "def fn_one():\n    return 1\n"
+            tf.write(code1)
+            tf.flush()
+            path = Path(tf.name)
+
+            # First run: parses AST and populates cache
+            chunks1 = chunk_file(path)
+            h1 = compute_content_hash(code1.encode("utf-8"))
+            cache_key1 = (str(path.resolve()), h1)
+            self.assertIn(cache_key1, _AST_CHUNK_CACHE)
+            self.assertEqual(len(chunks1), 1)
+
+            # Second run with same file content: serves directly from manifest cache (identical object)
+            chunks2 = chunk_file(path)
+            self.assertIs(chunks1, chunks2)
+
+            # Edit file: modifies SHA-1 hash and triggers new parse
+            code2 = "def fn_one():\n    return 1\n\ndef fn_two():\n    return 2\n"
+            tf.seek(0)
+            tf.write(code2)
+            tf.truncate()
+            tf.flush()
+
+            chunks3 = chunk_file(path)
+            h2 = compute_content_hash(code2.encode("utf-8"))
+            cache_key2 = (str(path.resolve()), h2)
+            self.assertIn(cache_key2, _AST_CHUNK_CACHE)
+            self.assertNotEqual(h1, h2)
+            self.assertEqual(len(chunks3), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

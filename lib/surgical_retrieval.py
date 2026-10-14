@@ -5,9 +5,23 @@ and extracts only the strictly necessary lines to minimize LLM token consumption
 """
 
 from __future__ import annotations
-from typing import Union, List, Dict
+import hashlib
+from typing import Union, List, Dict, Optional, Tuple
 from pathlib import Path
 from lib.client import query_laya
+
+# In-memory manifest cache: (file_path_str, sha1_hex) -> list of chunks
+_AST_CHUNK_CACHE: dict[tuple[str, str], list[dict]] = {}
+
+
+def compute_content_hash(raw_bytes: bytes) -> str:
+    """Compute SHA-1 hash for file content."""
+    return hashlib.sha1(raw_bytes).hexdigest()
+
+
+def clear_ast_cache():
+    """Clear memory manifest cache for test isolation."""
+    _AST_CHUNK_CACHE.clear()
 
 
 # Language mapping from extension or shebang
@@ -207,22 +221,38 @@ def _chunk_ast(
     return ast_chunks
 
 
-def chunk_file(file_path: Path, window_lines: int = 30, overlap: int = 5) -> list[dict]:
-    """Chunk a file into semantic units.
+def chunk_file(
+    file_path: Path,
+    window_lines: int = 30,
+    overlap: int = 5,
+    use_cache: bool = True,
+) -> list[dict]:
+    """Chunk a file into semantic units with SHA-1 content hash manifest memoization.
 
-    1. Detects file language automatically.
-    2. Uses tree-sitter AST to extract complete function/class/impl boundaries.
-    3. Falls back to sliding windows for non-code files, syntax errors, or unhandled gaps.
+    1. Checks (file_path, content_hash) in cache to skip redundant AST parsing.
+    2. Detects file language automatically.
+    3. Uses tree-sitter AST to extract complete function/class/impl boundaries.
+    4. Falls back to sliding windows for non-code files, syntax errors, or unhandled gaps.
     """
     if not file_path.exists() or file_path.is_dir():
         return []
 
     try:
         raw_bytes = file_path.read_bytes()
-        lines = raw_bytes.decode("utf-8", errors="replace").splitlines()
     except Exception:
         return []
 
+    if not raw_bytes.strip():
+        return []
+
+    file_str = str(file_path.resolve())
+    c_hash = compute_content_hash(raw_bytes)
+    cache_key = (file_str, c_hash)
+
+    if use_cache and cache_key in _AST_CHUNK_CACHE:
+        return _AST_CHUNK_CACHE[cache_key]
+
+    lines = raw_bytes.decode("utf-8", errors="replace").splitlines()
     if not lines:
         return []
 
@@ -230,10 +260,15 @@ def chunk_file(file_path: Path, window_lines: int = 30, overlap: int = 5) -> lis
     if lang in AST_BOUNDARY_NODES:
         ast_chunks = _chunk_ast(raw_bytes, lines, file_path, lang)
         if ast_chunks:
+            if use_cache:
+                _AST_CHUNK_CACHE[cache_key] = ast_chunks
             return ast_chunks
 
     # Fallback: Sliding window for plain text, markdown, config, or unparsed code
-    return _chunk_sliding_window(lines, file_path, window_lines=window_lines, overlap=overlap)
+    sliding_chunks = _chunk_sliding_window(lines, file_path, window_lines=window_lines, overlap=overlap)
+    if use_cache:
+        _AST_CHUNK_CACHE[cache_key] = sliding_chunks
+    return sliding_chunks
 
 
 def score_snippet(query: str, snippet: dict) -> float:

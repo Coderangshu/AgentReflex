@@ -18,7 +18,7 @@ Each tool runs locally against the resident Laya daemon in sub-50ms on GPU (MPS/
      - `score`: Confidence score (`0.0` to `1.0`).
 
 2. Surgical Code Retrieval (jevgrep)
-   - **What it does**: Performs semantic code retrieval across target files. Automatically detects file language (Rust, Python, TypeScript, Go, C/C++, Java) and extracts complete syntactic blocks (functions, classes, impl blocks) via tree-sitter AST, falling back to sliding windows for plain text or markup. Scores snippets locally via Laya in ~30ms, returning strictly relevant code.
+   - **What it does**: Performs semantic code retrieval across target files. Automatically detects file language (Rust, Python, TypeScript, Go, C/C++, Java) and extracts complete syntactic blocks (functions, classes, impl blocks) via tree-sitter AST with SHA-1 content hash manifest memoization (skipping re-parsing for unchanged files), falling back to sliding windows for plain text or markup. Scores snippets locally via Laya in ~30ms, returning strictly relevant code.
    - **User Skill Access**: Usable via skill **`/reflex-grep`** (or `skills/reflex-grep/run.py`).
    - **Input**:
      - `query`: Search intent or target logic description.

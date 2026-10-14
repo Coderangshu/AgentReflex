@@ -169,7 +169,11 @@ def main():
         clean_goal = re.sub(r"The current local time is:.*", "", user_goal, flags=re.DOTALL).strip() if user_goal else ""
         is_short_prompt = len(clean_goal) <= 35
 
-        if clean_goal and not is_short_prompt and len(recent_actions) >= 3 and tool_name not in READ_ONLY_TOOLS and not is_dev_verification:
+        # Exempt standard implementation file editing within the repository from hard denial
+        target_path = (args.get("TargetFile") or args.get("file_path") or "").lower()
+        is_repo_source_edit = any(target_path.endswith(ext) for ext in (".py", ".rs", ".ts", ".js", ".json", ".md"))
+
+        if clean_goal and not is_short_prompt and len(recent_actions) >= 3 and tool_name not in READ_ONLY_TOOLS and not is_dev_verification and not is_repo_source_edit:
             drift_res = check_intent_drift(
                 primary_goal=clean_goal,
                 recent_actions=recent_actions,
