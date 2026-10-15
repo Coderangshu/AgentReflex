@@ -6,8 +6,15 @@ Provides sub-30ms offline policy enforcement, intent routing, test coverage judg
 
 ---
 
+## 1. Quick Setup & Integration
+
 <details>
-<summary><strong>1. Quickstart & Daemon Setup</strong></summary>
+<summary><strong>Quick Setup & Integration</strong></summary>
+
+<br>
+
+<details>
+<summary><strong>Setup & Running Daemon</strong></summary>
 
 <br>
 
@@ -47,9 +54,10 @@ make stop
 
 </details>
 
----
+<details>
+<summary><strong>Agent Integration</strong></summary>
 
-## 2. Integration & Getting Started
+<br>
 
 Choose your coding agent below:
 
@@ -150,9 +158,13 @@ Once registered, Claude Code has instant access to 14 System 1 tools:
 
 </details>
 
+</details>
+
+</details>
+
 ---
 
-## 3. System 1 Decision & Safety Tools
+## 2. System 1 Decision & Safety Tools
 
 See the complete [Tool Reference](docs/tools.md) for full parameter schemas, input/output structures, and decision thresholds.
 
@@ -178,7 +190,7 @@ See the complete [Tool Reference](docs/tools.md) for full parameter schemas, inp
 
 ---
 
-## 4. Benchmarks & Performance Benefits
+## 3. Benchmarks & Performance Benefits
 
 Benchmarked directly against an active full-stack codebase (`Native-App` - React Native / Expo / Drizzle):
 
@@ -192,7 +204,7 @@ Benchmarked directly against an active full-stack codebase (`Native-App` - React
 
 ---
 
-## 5. Overcoming the Small Context Size Bottleneck
+## 4. Overcoming the Small Context Size Bottleneck
 
 The base Laya model (`ModernBERT-large`) is designed for sub-50ms System 1 classification with a single-window context budget of 512 tokens (~1,200 characters).
 
@@ -212,7 +224,7 @@ To eliminate this bottleneck without sacrificing speed:
 
 ---
 
-## 6. Latency & Time-To-First-Token (TTFT) Optimizations
+## 5. Latency & Time-To-First-Token (TTFT) Optimizations
 
 To ensure zero perceived lag on user turns—especially for rapid, interactive tasks—the client-daemon architecture incorporates three major latency optimizations:
 
@@ -246,7 +258,7 @@ To ensure zero perceived lag on user turns—especially for rapid, interactive t
 
 ---
 
-## 7. Real-World Project Activity Logging
+## 6. Real-World Project Activity Logging
 
 AgentReflex can record an audit trail of agent interactions across your active coding projects:
 - **User Prompts**: Every incoming prompt (`[TOOL: USER_PROMPT]`)
@@ -335,7 +347,7 @@ Example output:
 
 ---
 
-## 8. Roadmap
+## 7. Roadmap
 
 See the dedicated [Roadmap](docs/ROADMAP.md) for active optimizations, upcoming System 1 features, and architectural milestones.
 
