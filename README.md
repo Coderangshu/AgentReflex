@@ -6,7 +6,10 @@ Provides sub-30ms offline policy enforcement, intent routing, test coverage judg
 
 ---
 
-## 1. Quickstart & Daemon Setup
+<details>
+<summary><strong>1. Quickstart & Daemon Setup</strong></summary>
+
+<br>
 
 ### Step 1: Create Isolated Virtual Environment & Install
 Create a dedicated virtual environment inside `agentreflex` to isolate dependencies:
@@ -41,6 +44,8 @@ To stop the daemon when done:
 ```bash
 make stop
 ```
+
+</details>
 
 ---
 
