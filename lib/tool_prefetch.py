@@ -42,7 +42,7 @@ def is_safe_prefetch_action(tool: str, args: dict) -> bool:
     """Strict safety check: only read-only diagnostic actions may run speculatively."""
     if tool in ("view_file", "find_by_name", "grep_search", "read_resource", "list_resources"):
         # Ensure file path exists and is inside repository
-        target_file = args.get("AbsolutePath") or args.get("TargetFile") or args.get("path") or ""
+        target_file = args.get("AbsolutePath") or args.get("TargetFile") or args.get("path") or args.get("file_path") or ""
         if target_file and Path(target_file).is_file():
             return True
         return bool(tool in ("find_by_name", "grep_search", "list_resources"))
@@ -139,13 +139,15 @@ def execute_speculative_action(tool: str, args: dict, cwd: str = "") -> dict:
     t0 = time.time()
     try:
         if tool == "view_file":
-            path_str = args.get("AbsolutePath") or args.get("TargetFile") or args.get("path")
+            path_str = args.get("AbsolutePath") or args.get("TargetFile") or args.get("path") or args.get("file_path")
             p = Path(path_str)
             if not p.is_file():
                 return {"error": "File not found", "duration_ms": 0}
-            # Read first 800 lines (standard view_file budget)
-            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()[:800]
-            output = "\n".join(f"{i+1}: {line}" for i, line in enumerate(lines))
+            all_lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            start_l = max(1, int(args.get("StartLine", 1)))
+            end_l = min(len(all_lines), int(args.get("EndLine", min(len(all_lines), start_l + 799))))
+            lines = all_lines[start_l - 1:end_l]
+            output = "\n".join(f"{start_l + i}: {line}" for i, line in enumerate(lines))
             return {
                 "output": output,
                 "duration_ms": round((time.time() - t0) * 1000, 2),

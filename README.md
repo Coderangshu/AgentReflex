@@ -169,7 +169,7 @@ See the complete [Tool Reference](docs/tools.md) for full parameter schemas, inp
 16. **Dynamic Model Router**: Dynamically selects model tier (`flash`, `standard`, `frontier`), reasoning effort, and thinking budget based on prompt complexity.
 17. **DOM Element Selector**: Evaluates candidate interactive browser DOM elements against user navigation goals, choosing the single optimal element locally in ~40ms and avoiding massive raw HTML token dumps to LLMs.
 18. **Cross-Turn Intent Drift Alarm**: Compares active multi-turn tool action traces against the original user goal using resident neural scoring to halt off-topic drift.
-19. **Speculate-and-Verify Tool Prefetching**: Predicts candidate read-only tools and runs them in background via daemon UDS, serving output at 0ms latency upon tool emission.
+19. **Speculate-and-Verify Tool Prefetching**: Predicts candidate read-only tools and extracts compiler/test crash traceback frames across 8 languages, prefetching culprit files in background via daemon UDS to serve output at 0ms latency upon tool emission.
 
 ---
 
@@ -330,13 +330,10 @@ Example output:
 
 ---
 
-## 8. Roadmap & In-Progress Features
+## 8. Roadmap
 
-See the dedicated [Roadmap](docs/ROADMAP.md) for active optimizations in progress and planned capabilities:
+See the dedicated [Roadmap](docs/ROADMAP.md) for active optimizations, upcoming System 1 features, and architectural milestones.
 
-- **Cross-Turn Intent Drift Alarm**: Proactive course-correction when multi-turn execution wanders off-topic.
-- **Speculate-and-Verify Tool Prefetching**: Predicts and runs read-only diagnostic actions in the background.
-- **Ephemeral Scratchpad Auto-Janitor**: Cleans disposable scratch files and temp scripts after turn completion.
 
 
 

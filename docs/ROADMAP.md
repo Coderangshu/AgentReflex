@@ -9,6 +9,5 @@ For the comprehensive reference of all implemented tools and parameters, see [To
 ## Planned Optimizations
 
 - [ ] **Ephemeral Scratchpad Auto-Janitor**: Post-invocation hook that tracks and cleans disposable scratch files, test dumps, and temporary scripts created during agent execution to maintain repository hygiene.
-- [ ] **Traceback Frame Regex Extractor for Speculative Prefetch**: Parse stack frames (`File "...", line N`) from failed command outputs to speculate-fetch culprit source files with 100% precision before the LLM requests them.
 - [ ] **ONNX Runtime & INT8 Quantization for CPU-Only Environments**: Export ModernBERT to an INT8 ONNX graph with AVX-512/VNNI acceleration via `CPUExecutionProvider` in `daemon/server.py`. Automatically activates on systems lacking Apple Silicon (MPS) or NVIDIA/AMD GPUs (CUDA/ROCm), reducing CPU inference latency from ~280ms to ~35–50ms.
 

@@ -86,6 +86,25 @@ def main():
                     f"(risk score: {eval_result['uncovered_risk']:.2f}). Consider writing unit tests.\n"
                 )
 
+        # Speculative prefetch for culprit files on command failure or crash tracebacks
+        t_lower = tool_name.lower()
+        if ("command" in t_lower or "bash" in t_lower or "exec" in t_lower) and response:
+            is_failure = status == "error" or any(k in response.lower() for k in ("traceback", "error[", "panic:", "fatal error:", "exception:", "syntaxerror"))
+            if is_failure:
+                try:
+                    from lib.traceback_extractor import extract_culprit_frame
+                    from lib.client import trigger_prefetch
+
+                    frame = extract_culprit_frame(response, cwd=project_dir or cwd_val)
+                    if frame and frame.get("file"):
+                        trigger_prefetch(
+                            tool="view_file",
+                            args={"AbsolutePath": frame["file"]},
+                            cwd=project_dir or cwd_val or "",
+                        )
+                except Exception:
+                    pass
+
         # Standard PostToolUse output is an empty JSON object
         print(json.dumps({}))
     except Exception:

@@ -181,7 +181,7 @@ Each tool runs locally against the resident Laya daemon in sub-50ms on GPU (MPS/
       - `warning`: Remediation warning prompt when drift is detected.
 
 19. Speculate-and-Verify Tool Prefetching
-    - **What it does**: Predicts likely read-only diagnostic actions (`view_file`, `git status`) via resident Laya scoring and triggers speculative execution in the background via the AgentReflex daemon over UDS, cutting execution latency to 0ms upon tool emission.
+    - **What it does**: Predicts likely read-only diagnostic actions (`view_file`, `git status`) via resident Laya scoring during prompt arrival, and parses compiler/test runner stack frames (Python, Rust, TypeScript, JavaScript, Go, C/C++, Ruby, PHP) from command failures via regex extraction to proactively prefetch culprit source files in the background via the AgentReflex daemon over UDS, cutting execution latency to 0ms upon tool emission.
     - **Input**:
       - `action`: `"predict"` (anticipate next read-only tool), `"claim"` (retrieve cached output), or `"invalidate"` (clear cache on mutating edit).
       - `prompt`: User prompt or intent (when action is `"predict"`).
